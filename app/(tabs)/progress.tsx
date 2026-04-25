@@ -95,7 +95,7 @@ const PROGRESS_DATA: Record<
       { avgKm: 2.2, dateRange: '1 - 31 March' },
     ],
     highlightText:
-      'Amazing month! Your distance increased 42% compared to March.\nYou have ve burned over 7,000 calories this month.',
+      'Amazing month! Your distance increased 42% compared to March.\nYou have wve burned over 7,000 calories this month.',
   },
 };
 
