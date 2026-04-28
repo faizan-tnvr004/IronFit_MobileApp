@@ -9,14 +9,11 @@ import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
-
-const activities = [
-  { id: '1', name: 'Running', duration: '25 min', calories: '220 kcal', icon: 'street-view' as const, color: '#F97316', route: '/running' },
-  { id: '2', name: 'Cycling', duration: '45 min', calories: '380 kcal', icon: 'bicycle' as const, color: '#22C55E', route: '/cycling' },
-];
+import { useActivities } from '@/context/ActivityContext';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { activities } = useActivities();
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
@@ -63,7 +60,7 @@ export default function HomeScreen() {
             onPress={() => router.push(item.route as any)}
           >
             <View style={[s.activityIcon, { backgroundColor: item.color + '22' }]}>
-              <FontAwesome name={item.icon} size={18} color={item.color} />
+              <FontAwesome name={item.icon as any} size={18} color={item.color} />
             </View>
             <View style={s.activityInfo}>
               <Text style={s.activityName}>{item.name}</Text>
@@ -103,10 +100,7 @@ export default function HomeScreen() {
                 <Text style={s.workoutDuration}>{workout.duration}</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={s.startBtn}
-              onPress={() => router.push(workout.route as any)}
-            >
+            <TouchableOpacity style={s.startBtn} onPress={() => router.push(workout.route as any)}>
               <Text style={s.startBtnText}>Start</Text>
             </TouchableOpacity>
           </View>
