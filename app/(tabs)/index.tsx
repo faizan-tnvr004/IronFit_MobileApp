@@ -1,35 +1,25 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
+  View, Text, ScrollView, StyleSheet,
+  TouchableOpacity, SafeAreaView, StatusBar,
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useRouter } from 'expo-router';
 import {
-  useFonts,
-  Nunito_400Regular,
-  Nunito_600SemiBold,
-  Nunito_700Bold,
-  Nunito_800ExtraBold,
+  useFonts, Nunito_400Regular, Nunito_600SemiBold,
+  Nunito_700Bold, Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
 
 const activities = [
-  { id: '1', name: 'Running', duration: '25 min', calories: '220 kcal', icon: 'street-view' as const, color: '#F97316' },
-  { id: '2', name: 'Cycling', duration: '45 min', calories: '380 kcal', icon: 'bicycle' as const, color: '#22C55E' },
+  { id: '1', name: 'Running', duration: '25 min', calories: '220 kcal', icon: 'street-view' as const, color: '#F97316', route: '/running' },
+  { id: '2', name: 'Cycling', duration: '45 min', calories: '380 kcal', icon: 'bicycle' as const, color: '#22C55E', route: '/cycling' },
 ];
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [fontsLoaded] = useFonts({
-    Nunito_400Regular,
-    Nunito_600SemiBold,
-    Nunito_700Bold,
-    Nunito_800ExtraBold,
+    Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
-
   if (!fontsLoaded) return null;
 
   return (
@@ -37,7 +27,6 @@ export default function HomeScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#13131f" />
       <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 100 }}>
 
-        {/* Header */}
         <View style={s.header}>
           <View>
             <Text style={s.greeting}>Hello, Alex</Text>
@@ -48,7 +37,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Progress Card */}
         <View style={s.progressCard}>
           <Text style={s.progressLabel}>Today's Progress</Text>
           <View style={s.stepsRow}>
@@ -61,16 +49,19 @@ export default function HomeScreen() {
           <Text style={s.progressPercent}>73% of daily goal</Text>
         </View>
 
-        {/* Today's Activities */}
         <View style={s.sectionHeader}>
           <Text style={s.sectionTitle}>Today's Activities</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/add-activity')}>
             <Text style={s.addActivity}>+ Add Activity</Text>
           </TouchableOpacity>
         </View>
 
         {activities.map((item) => (
-          <TouchableOpacity key={item.id} style={s.activityCard}>
+          <TouchableOpacity
+            key={item.id}
+            style={s.activityCard}
+            onPress={() => router.push(item.route as any)}
+          >
             <View style={[s.activityIcon, { backgroundColor: item.color + '22' }]}>
               <FontAwesome name={item.icon} size={18} color={item.color} />
             </View>
@@ -82,7 +73,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         ))}
 
-        {/* Quick Stats */}
         <Text style={[s.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>Quick Stats</Text>
         <View style={s.statsRow}>
           {[
@@ -97,12 +87,10 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        {/* Suggested Workouts */}
         <Text style={[s.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>Suggested Workouts</Text>
-
         {[
-          { name: 'Morning Run', desc: 'Burn fat and boost endurance', icon: 'street-view' as const, color: '#F97316', duration: '30 min' },
-          { name: 'HIIT Training', desc: 'High intensity full body workout', icon: 'fire' as const, color: '#EF4444', duration: '20 min' },
+          { name: 'Morning Run', desc: 'Burn fat and boost endurance', icon: 'street-view' as const, color: '#F97316', duration: '30 min', route: '/running' },
+          { name: 'HIIT Training', desc: 'High intensity full body workout', icon: 'fire' as const, color: '#EF4444', duration: '20 min', route: '/running' },
         ].map((workout) => (
           <View key={workout.name} style={s.workoutCard}>
             <View style={s.workoutLeft}>
@@ -115,7 +103,10 @@ export default function HomeScreen() {
                 <Text style={s.workoutDuration}>{workout.duration}</Text>
               </View>
             </View>
-            <TouchableOpacity style={s.startBtn}>
+            <TouchableOpacity
+              style={s.startBtn}
+              onPress={() => router.push(workout.route as any)}
+            >
               <Text style={s.startBtnText}>Start</Text>
             </TouchableOpacity>
           </View>
@@ -129,113 +120,36 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#13131f' },
   container: { flex: 1, paddingHorizontal: 20 },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 60,
-    marginBottom: 24,
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 60, marginBottom: 24 },
   greeting: { fontFamily: 'Nunito_800ExtraBold', fontSize: 28, color: '#fff' },
   subGreeting: { fontFamily: 'Nunito_400Regular', fontSize: 14, color: '#9999bb', marginTop: 2 },
-  notifBtn: {
-    backgroundColor: '#1e1e30',
-    padding: 11,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#2e2e44',
-  },
-
-  progressCard: {
-    backgroundColor: '#F97316',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 28,
-  },
+  notifBtn: { backgroundColor: '#1e1e30', padding: 11, borderRadius: 14, borderWidth: 1, borderColor: '#2e2e44' },
+  progressCard: { backgroundColor: '#F97316', borderRadius: 20, padding: 20, marginBottom: 28 },
   progressLabel: { fontFamily: 'Nunito_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 6 },
   stepsRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 16 },
   stepsCount: { fontFamily: 'Nunito_800ExtraBold', fontSize: 44, color: '#fff' },
   stepsUnit: { fontFamily: 'Nunito_400Regular', fontSize: 16, color: 'rgba(255,255,255,0.8)' },
-  progressBarBg: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 3,
-    marginBottom: 8,
-  },
+  progressBarBg: { height: 6, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 3, marginBottom: 8 },
   progressBarFill: { height: 6, backgroundColor: '#fff', borderRadius: 3 },
   progressPercent: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.8)' },
-
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontFamily: 'Nunito_700Bold', fontSize: 18, color: '#fff' },
   addActivity: { fontFamily: 'Nunito_600SemiBold', fontSize: 13, color: '#F97316' },
-
-  activityCard: {
-    backgroundColor: '#1e1e30',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#2e2e44',
-  },
-  activityIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
+  activityCard: { backgroundColor: '#1e1e30', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#2e2e44' },
+  activityIcon: { width: 46, height: 46, borderRadius: 13, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   activityInfo: { flex: 1 },
   activityName: { fontFamily: 'Nunito_700Bold', fontSize: 16, color: '#e0e0ff' },
   activityMeta: { fontFamily: 'Nunito_400Regular', fontSize: 13, color: '#9999bb', marginTop: 3 },
-
   statsRow: { flexDirection: 'row', gap: 10 },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#1e1e30',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#2e2e44',
-  },
+  statCard: { flex: 1, backgroundColor: '#1e1e30', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2e2e44' },
   statValue: { fontFamily: 'Nunito_800ExtraBold', fontSize: 22, color: '#fff' },
   statLabel: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: '#9999bb', marginTop: 4 },
-
-  workoutCard: {
-    backgroundColor: '#1e1e30',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#2e2e44',
-  },
+  workoutCard: { backgroundColor: '#1e1e30', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, borderWidth: 1, borderColor: '#2e2e44' },
   workoutLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  workoutIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  workoutIcon: { width: 46, height: 46, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
   workoutName: { fontFamily: 'Nunito_700Bold', fontSize: 15, color: '#e0e0ff' },
   workoutDesc: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: '#9999bb', marginTop: 2 },
   workoutDuration: { fontFamily: 'Nunito_600SemiBold', fontSize: 12, color: '#F97316', marginTop: 3 },
-  startBtn: {
-    backgroundColor: '#F97316',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
+  startBtn: { backgroundColor: '#F97316', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
   startBtnText: { fontFamily: 'Nunito_700Bold', fontSize: 13, color: '#fff' },
 });

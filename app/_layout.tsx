@@ -53,6 +53,9 @@ function RootLayoutNav() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="add-activity" options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
+        <Stack.Screen name="running" options={{ headerShown: false }} />
+        <Stack.Screen name="cycling" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );
