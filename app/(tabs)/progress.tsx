@@ -1,19 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, Modal, TextInput, Alert, Dimensions } from 'react-native';
 import { useFonts, Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { LineChart } from 'react-native-chart-kit';
 import { useAuth } from '@/context/AuthContext';
-import { getActivitiesInRange, ActivityLog } from '@/services/firestoreService';
+import { getActivitiesInRange, ActivityLog, getWeightLogs, addWeightLog, WeightLog } from '@/services/firestoreService';
 
 const TIME_RANGES = ['1 Week', '2 Week', '3 Week', '1 Month'] as const;
 type TimeRange = (typeof TIME_RANGES)[number];
+const W = Dimensions.get('window').width;
 
 export default function ProgressScreen() {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1 Week');
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [prevLogs, setPrevLogs] = useState<ActivityLog[]>([]);
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Weight logging modal
+  const [showWeightModal, setShowWeightModal] = useState(false);
+  const [newWeight, setNewWeight] = useState('');
+  const [isSubmittingWeight, setIsSubmittingWeight] = useState(false);
 
   const [fontsLoaded] = useFonts({ Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold });
 
@@ -38,15 +46,39 @@ export default function ProgressScreen() {
       const prevStart = new Date();
       prevStart.setDate(prevEnd.getDate() - (days - 1));
 
-      const currentData = await getActivitiesInRange(user.uid, start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
-      const previousData = await getActivitiesInRange(user.uid, prevStart.toISOString().split('T')[0], prevEnd.toISOString().split('T')[0]);
+      const [currentData, previousData, wData] = await Promise.all([
+        getActivitiesInRange(user.uid, start.toISOString().split('T')[0], end.toISOString().split('T')[0]),
+        getActivitiesInRange(user.uid, prevStart.toISOString().split('T')[0], prevEnd.toISOString().split('T')[0]),
+        getWeightLogs(user.uid)
+      ]);
       
       setLogs(currentData);
       setPrevLogs(previousData);
+      setWeightLogs(wData);
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLogWeight = async () => {
+    if (!newWeight || !user) return;
+    setIsSubmittingWeight(true);
+    try {
+      await addWeightLog(user.uid, {
+        weight: parseFloat(newWeight),
+        date: new Date().toISOString().split('T')[0]
+      });
+      await refreshProfile();
+      await fetchProgressData();
+      setShowWeightModal(false);
+      setNewWeight('');
+      Alert.alert('Success', 'Weight logged successfully!');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to log weight');
+    } finally {
+      setIsSubmittingWeight(false);
     }
   };
 
@@ -69,6 +101,22 @@ export default function ProgressScreen() {
     : currentDist > 0 
       ? `You are staying active!\nKeep up the consistency to see even better results in the coming weeks.`
       : `No activity recorded yet for this period.\nLet's get moving and start your fitness journey today!`;
+
+  // Weight Chart Data - ensuring we have safe defaults to prevent render errors
+  const lastSevenWeightLogs = weightLogs.slice(-7);
+  const wLabels = lastSevenWeightLogs.map(wl => {
+    const parts = wl.date ? wl.date.split('-') : [];
+    return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : '??/??';
+  });
+  const wValues = lastSevenWeightLogs.map(wl => wl.weight || 0);
+  
+  const weightChartData = {
+    labels: wLabels.length > 0 ? wLabels : ['No Data'],
+    datasets: [{
+      data: wValues.length > 0 ? wValues : [0],
+      strokeWidth: 2,
+    }],
+  };
 
   return (
     <View style={s.screen}>
@@ -119,6 +167,39 @@ export default function ProgressScreen() {
           </View>
         </View>
 
+        {/* Weight Chart Section */}
+        <View style={s.statsCard}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={s.infoTitle}>Weight Trend (kg)</Text>
+            <TouchableOpacity style={s.addWeightBtn} onPress={() => setShowWeightModal(true)}>
+              <Text style={s.addWeightText}>+ Log Weight</Text>
+            </TouchableOpacity>
+          </View>
+          {weightLogs.length > 0 ? (
+            <LineChart
+              data={weightChartData}
+              width={W - 64}
+              height={180}
+              chartConfig={{
+                backgroundColor: '#1e1e30',
+                backgroundGradientFrom: '#1e1e30',
+                backgroundGradientTo: '#1e1e30',
+                decimalPlaces: 1,
+                color: (opacity = 1) => `rgba(249, 115, 22, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(153, 153, 187, ${opacity})`,
+                propsForDots: { r: '4', strokeWidth: '2', stroke: '#F97316' },
+                propsForBackgroundLines: { stroke: '#2e2e44' },
+              }}
+              bezier
+              style={{ borderRadius: 16 }}
+            />
+          ) : (
+            <View style={s.emptyWeight}>
+              <Text style={s.emptyWeightText}>No weight logs yet. Start tracking to see progress!</Text>
+            </View>
+          )}
+        </View>
+
         <View style={s.statsCard}>
           <View style={s.statsRow}>
             {[
@@ -160,6 +241,32 @@ export default function ProgressScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Weight Modal */}
+      <Modal visible={showWeightModal} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Log Your Weight</Text>
+            <TextInput
+              style={s.modalInput}
+              placeholder="e.g. 72.5"
+              placeholderTextColor="#666"
+              keyboardType="numeric"
+              value={newWeight}
+              onChangeText={setNewWeight}
+              autoFocus
+            />
+            <View style={s.modalActions}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setShowWeightModal(false)} disabled={isSubmittingWeight}>
+                <Text style={s.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.modalSave} onPress={handleLogWeight} disabled={isSubmittingWeight}>
+                <Text style={s.modalSaveText}>{isSubmittingWeight ? 'Saving...' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -194,6 +301,11 @@ const s = StyleSheet.create({
   statLabel: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: '#9999bb', marginBottom: 6 },
   statValue: { fontFamily: 'Nunito_800ExtraBold', fontSize: 22, color: '#fff' },
   statUnit: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: '#9999bb' },
+  infoTitle: { fontFamily: 'Nunito_700Bold', fontSize: 18, color: '#fff' },
+  addWeightBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#F9731618', borderWidth: 1, borderColor: '#F9731633' },
+  addWeightText: { fontFamily: 'Nunito_700Bold', fontSize: 12, color: '#F97316' },
+  emptyWeight: { height: 100, alignItems: 'center', justifyContent: 'center' },
+  emptyWeightText: { fontFamily: 'Nunito_400Regular', fontSize: 13, color: '#9999bb', textAlign: 'center' },
   highlightsSection: { marginHorizontal: 16, marginTop: 24, backgroundColor: '#1e1e30', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#2e2e44' },
   highlightsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   highlightsTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, color: '#fff' },
@@ -206,4 +318,14 @@ const s = StyleSheet.create({
   dateBadgePrimary: { backgroundColor: '#2d2b55' },
   dateBadgeText: { fontFamily: 'Nunito_600SemiBold', fontSize: 12 },
   dateBadgeTextPrimary: { color: '#c4c0ff' },
+  
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
+  modalCard: { backgroundColor: '#1e1e30', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#2e2e44' },
+  modalTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, color: '#fff', marginBottom: 20 },
+  modalInput: { backgroundColor: '#13131f', borderRadius: 12, padding: 14, fontFamily: 'Nunito_600SemiBold', fontSize: 16, color: '#e0e0ff', borderWidth: 1, borderColor: '#2e2e44', marginBottom: 20 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
+  modalCancel: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#13131f', borderWidth: 1, borderColor: '#2e2e44' },
+  modalCancelText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#9999bb' },
+  modalSave: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#F97316' },
+  modalSaveText: { fontFamily: 'Nunito_700Bold', fontSize: 14, color: '#fff' },
 });

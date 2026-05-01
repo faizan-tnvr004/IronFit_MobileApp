@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView,
-  StatusBar, TouchableOpacity, Dimensions, Alert, Modal, TextInput, ActivityIndicator
+  StatusBar, TouchableOpacity, Dimensions, Alert, Modal, TextInput, ActivityIndicator, Platform
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { LineChart } from 'react-native-chart-kit';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
@@ -30,7 +31,8 @@ export default function WalkingScreen() {
   const [showModal, setShowModal] = useState(false);
   const [duration, setDuration] = useState('');
   const [distance, setDistance] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export default function WalkingScreen() {
   };
 
   const handleLogActivity = async () => {
-    if (!duration || !distance || !date) {
+    if (!duration || !distance) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -76,8 +78,8 @@ export default function WalkingScreen() {
         durationMin: durNum,
         distance: distNum,
         caloriesBurned: calories,
-        date: date,
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        date: date.toISOString().split('T')[0],
+        time: date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
       });
 
       Alert.alert('Success', 'Activity logged successfully!');
@@ -93,12 +95,17 @@ export default function WalkingScreen() {
     }
   };
 
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || date;
+    setShowDatePicker(Platform.OS === 'ios');
+    setDate(currentDate);
+  };
+
   if (!fontsLoaded) return null;
 
   const totalDistance = logs.reduce((sum, log) => sum + (log.distance || 0), 0);
   const totalTime = logs.reduce((sum, log) => sum + log.durationMin, 0);
   const totalCalories = logs.reduce((sum, log) => sum + log.caloriesBurned, 0);
-  // Rough estimate for steps (1km ~= 1312 steps)
   const totalSteps = Math.round(totalDistance * 1312);
 
   const chartData = [0, 0, 0, 0, 0, 0, 0];
@@ -112,7 +119,7 @@ export default function WalkingScreen() {
       const diffTime = Math.abs(today.getTime() - logDate.getTime());
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays >= 0 && diffDays < 7) {
-        chartData[6 - diffDays] += Math.round((log.distance || 0) * 1312); // convert to steps
+        chartData[6 - diffDays] += Math.round((log.distance || 0) * 1312);
       }
     });
   }
@@ -192,8 +199,19 @@ export default function WalkingScreen() {
             <Text style={s.modalTitle}>Log Walking Session</Text>
             
             <View style={s.inputWrap}>
-              <Text style={s.modalLabel}>Date (YYYY-MM-DD)</Text>
-              <TextInput style={s.modalInput} value={date} onChangeText={setDate} placeholderTextColor="#666" />
+              <Text style={s.modalLabel}>Activity Date & Time</Text>
+              <TouchableOpacity style={s.modalInput} onPress={() => setShowDatePicker(true)}>
+                <Text style={{ color: '#fff' }}>{date.toLocaleString()}</Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={date}
+                  mode="datetime"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onDateChange}
+                  maximumDate={new Date()}
+                />
+              )}
             </View>
             
             <View style={s.inputWrap}>
@@ -243,7 +261,7 @@ const s = StyleSheet.create({
   modalTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, color: '#fff', marginBottom: 20 },
   inputWrap: { marginBottom: 16 },
   modalLabel: { fontFamily: 'Nunito_600SemiBold', fontSize: 13, color: '#9999bb', marginBottom: 8 },
-  modalInput: { backgroundColor: '#13131f', borderRadius: 12, padding: 14, fontFamily: 'Nunito_600SemiBold', fontSize: 16, color: '#e0e0ff', borderWidth: 1, borderColor: '#2e2e44' },
+  modalInput: { backgroundColor: '#13131f', borderRadius: 12, padding: 14, fontFamily: 'Nunito_600SemiBold', fontSize: 16, color: '#e0e0ff', borderWidth: 1, borderColor: '#2e2e44', justifyContent: 'center' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 10 },
   modalCancel: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#13131f', borderWidth: 1, borderColor: '#2e2e44' },
   modalCancelText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#9999bb' },

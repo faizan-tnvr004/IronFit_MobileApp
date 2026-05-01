@@ -17,7 +17,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const { signIn, isLoading } = useAuth();
+  const { signIn, resetPassword, isLoading } = useAuth();
 
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
@@ -35,6 +35,20 @@ export default function LoginScreen() {
       // Navigation is handled automatically by the AuthGate in _layout.tsx
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to login');
+    }
+  };
+
+  const handleForgot = async () => {
+    if (!email) {
+      setErrorMsg('Please enter your email first');
+      return;
+    }
+    try {
+      await resetPassword(email);
+      Alert.alert('Success', 'Password reset email sent!');
+      setErrorMsg('');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to send reset email');
     }
   };
 
@@ -87,7 +101,7 @@ export default function LoginScreen() {
           </View>
 
           {/* Forgot */}
-          <TouchableOpacity style={s.forgotWrap}>
+          <TouchableOpacity style={s.forgotBtn} onPress={handleForgot}>
             <Text style={s.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
 

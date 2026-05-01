@@ -68,7 +68,19 @@ export default function HistoryScreen() {
   });
   markedDates[sel] = { ...(markedDates[sel] || {}), selected: true, selectedColor: '#F97316', selectedTextColor: '#fff' };
 
-  const displayDate = new Date(sel + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  let displayDate = 'Invalid Date';
+  let monthName = 'Summary';
+  try {
+    if (sel) {
+      const dateObj = new Date(sel + 'T00:00:00');
+      if (!isNaN(dateObj.getTime())) {
+        displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        monthName = dateObj.toLocaleDateString('en-US', { month: 'long' });
+      }
+    }
+  } catch (e) {
+    console.error("Date error:", e);
+  }
 
   // Monthly summary (for the month of the selected date)
   const selMonth = sel.split('-')[1];
@@ -76,7 +88,6 @@ export default function HistoryScreen() {
   const monthWorkouts = monthActivities.length;
   const monthCal = monthActivities.reduce((s, a) => s + a.caloriesBurned, 0);
   const monthKm = monthActivities.reduce((s, a) => s + (a.distance ?? 0), 0);
-  const monthName = new Date(sel + 'T00:00:00').toLocaleDateString('en-US', { month: 'long' });
 
   return (
     <View style={s.screen}>

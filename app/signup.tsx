@@ -33,6 +33,10 @@ export default function SignupScreen() {
       setErrorMsg('Please fill in all fields');
       return;
     }
+    if (password.length < 8) {
+      setErrorMsg('Password must be at least 8 characters');
+      return;
+    }
     if (password !== confirm) {
       setErrorMsg('Passwords do not match');
       return;

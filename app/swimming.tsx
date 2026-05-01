@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView,
-  StatusBar, TouchableOpacity, Dimensions, Alert, Modal, TextInput, ActivityIndicator
+  StatusBar, TouchableOpacity, Dimensions, Alert, Modal, TextInput, ActivityIndicator, Platform
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
-import { BarChart } from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
@@ -29,8 +30,8 @@ export default function SwimmingScreen() {
   
   const [showModal, setShowModal] = useState(false);
   const [duration, setDuration] = useState('');
-  const [distance, setDistance] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -44,13 +45,8 @@ export default function SwimmingScreen() {
       const today = new Date();
       const weekAgo = new Date();
       weekAgo.setDate(today.getDate() - 6);
-      
-      const d1 = weekAgo.toISOString().split('T')[0];
-      const d2 = today.toISOString().split('T')[0];
-      
-      const data = await getActivitiesInRange(user.uid, d1, d2);
-      const activityLogs = data.filter(a => a.type === 'Swimming');
-      setLogs(activityLogs);
+      const data = await getActivitiesInRange(user.uid, weekAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]);
+      setLogs(data.filter(a => a.type === 'Swimming'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -59,8 +55,8 @@ export default function SwimmingScreen() {
   };
 
   const handleLogActivity = async () => {
-    if (!duration || !distance || !date) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!duration) {
+      Alert.alert('Error', 'Please enter duration');
       return;
     }
     if (!user || !userProfile) return;
@@ -68,22 +64,19 @@ export default function SwimmingScreen() {
     setIsSubmitting(true);
     try {
       const durNum = parseInt(duration);
-      const distNum = parseFloat(distance);
       const calories = calculateCalories('Swimming', durNum, userProfile.weightKg);
 
       await addActivityLog(user.uid, {
         type: 'Swimming',
         durationMin: durNum,
-        distance: distNum,
         caloriesBurned: calories,
-        date: date,
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        date: date.toISOString().split('T')[0],
+        time: date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
       });
 
       Alert.alert('Success', 'Activity logged successfully!');
       setShowModal(false);
       setDuration('');
-      setDistance('');
       fetchData();
       refreshActivities();
     } catch (err) {
@@ -93,15 +86,19 @@ export default function SwimmingScreen() {
     }
   };
 
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || date;
+    setShowDatePicker(Platform.OS === 'ios');
+    setDate(currentDate);
+  };
+
   if (!fontsLoaded) return null;
 
-  const totalDistance = logs.reduce((sum, log) => sum + (log.distance || 0), 0);
   const totalTime = logs.reduce((sum, log) => sum + log.durationMin, 0);
   const totalCalories = logs.reduce((sum, log) => sum + log.caloriesBurned, 0);
 
   const chartData = [0, 0, 0, 0, 0, 0, 0];
   const labels = ['6d', '5d', '4d', '3d', '2d', '1d', 'Today'];
-  
   if (logs.length > 0) {
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -110,73 +107,55 @@ export default function SwimmingScreen() {
       const diffTime = Math.abs(today.getTime() - logDate.getTime());
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays >= 0 && diffDays < 7) {
-        chartData[6 - diffDays] += (log.distance || 0);
+        chartData[6 - diffDays] += log.durationMin;
       }
     });
   }
 
   const weekData = {
     labels,
-    datasets: [{ data: chartData.some(d => d > 0) ? chartData : [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1] }],
+    datasets: [{ data: chartData.some(d => d > 0) ? chartData : [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], strokeWidth: 2 }],
   };
 
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#13131f" />
-
       <View style={s.container}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <FontAwesome name="chevron-left" size={16} color="#fff" />
         </TouchableOpacity>
-
         <Text style={s.title}>Swimming</Text>
-
         {isLoading ? (
           <ActivityIndicator size="large" color="#3B82F6" style={{ marginTop: 50 }} />
         ) : (
           <>
             <View style={s.statsGrid}>
-              {[
-                { label: 'Distance (7d)', value: totalDistance.toFixed(1), unit: 'km' },
-                { label: 'Calories',      value: totalCalories.toString(), unit: 'kcal' },
-                { label: 'Duration',      value: totalTime.toString(), unit: 'min' },
-                { label: 'Sessions',      value: logs.length.toString(), unit: '' },
-              ].map((stat) => (
-                <View key={stat.label} style={s.statCard}>
-                  <Text style={s.statLabel}>{stat.label}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                    <Text style={s.statValue}>{stat.value}</Text>
-                    {stat.unit ? <Text style={s.statUnit}>{stat.unit}</Text> : null}
-                  </View>
-                </View>
-              ))}
+              <View style={s.statCard}><Text style={s.statLabel}>Total Time (7d)</Text><Text style={s.statValue}>{totalTime}<Text style={s.statUnit}>min</Text></Text></View>
+              <View style={s.statCard}><Text style={s.statLabel}>Calories Burned</Text><Text style={s.statValue}>{totalCalories}<Text style={s.statUnit}>kcal</Text></Text></View>
             </View>
-
             <View style={s.chartCard}>
-              <Text style={s.chartTitle}>Swimming Sessions (km)</Text>
-              <BarChart
+              <Text style={s.chartTitle}>Weekly Swimming (min)</Text>
+              <LineChart
                 data={weekData}
                 width={W - 64}
                 height={180}
-                yAxisLabel=""
-                yAxisSuffix=""
                 chartConfig={{
                   backgroundColor: '#1e1e30',
                   backgroundGradientFrom: '#1e1e30',
                   backgroundGradientTo: '#1e1e30',
-                  decimalPlaces: 1,
+                  decimalPlaces: 0,
                   color: (opacity = 1) => `rgba(59,130,246,${opacity})`,
                   labelColor: (opacity = 1) => `rgba(153,153,187,${opacity})`,
-                  propsForBackgroundLines: { stroke: '#2e2e44', strokeDasharray: '4' },
+                  propsForDots: { r: '4', strokeWidth: '2', stroke: '#3B82F6' },
+                  propsForBackgroundLines: { stroke: '#2e2e44' },
                 }}
+                bezier
                 style={{ borderRadius: 12, marginTop: 8 }}
-                showValuesOnTopOfBars={false}
               />
             </View>
           </>
         )}
       </View>
-
       <View style={s.footer}>
         <TouchableOpacity style={[s.startBtn, { backgroundColor: '#3B82F6' }]} onPress={() => setShowModal(true)}>
           <FontAwesome name="plus" size={16} color="#fff" style={{ marginRight: 10 }} />
@@ -188,34 +167,26 @@ export default function SwimmingScreen() {
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>Log Swimming Session</Text>
-            
             <View style={s.inputWrap}>
-              <Text style={s.modalLabel}>Date (YYYY-MM-DD)</Text>
-              <TextInput style={s.modalInput} value={date} onChangeText={setDate} placeholderTextColor="#666" />
+              <Text style={s.modalLabel}>Activity Date & Time</Text>
+              <TouchableOpacity style={s.modalInput} onPress={() => setShowDatePicker(true)}>
+                <Text style={{ color: '#fff' }}>{date.toLocaleString()}</Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker value={date} mode="datetime" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={onDateChange} maximumDate={new Date()} />
+              )}
             </View>
-            
             <View style={s.inputWrap}>
               <Text style={s.modalLabel}>Duration (minutes)</Text>
               <TextInput style={s.modalInput} value={duration} onChangeText={setDuration} keyboardType="numeric" placeholderTextColor="#666" />
             </View>
-
-            <View style={s.inputWrap}>
-              <Text style={s.modalLabel}>Distance (km)</Text>
-              <TextInput style={s.modalInput} value={distance} onChangeText={setDistance} keyboardType="numeric" placeholderTextColor="#666" />
-            </View>
-
             <View style={s.modalActions}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)} disabled={isSubmitting}>
-                <Text style={s.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.modalSave, { backgroundColor: '#3B82F6' }]} onPress={handleLogActivity} disabled={isSubmitting}>
-                <Text style={s.modalSaveText}>{isSubmitting ? 'Saving...' : 'Save'}</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)} disabled={isSubmitting}><Text style={s.modalCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.modalSave, { backgroundColor: '#3B82F6' }]} onPress={handleLogActivity} disabled={isSubmitting}><Text style={s.modalSaveText}>{isSubmitting ? 'Saving...' : 'Save'}</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
@@ -230,18 +201,17 @@ const s = StyleSheet.create({
   statLabel: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: '#9999bb', marginBottom: 6 },
   statValue: { fontFamily: 'Nunito_800ExtraBold', fontSize: 26, color: '#fff' },
   statUnit: { fontFamily: 'Nunito_400Regular', fontSize: 14, color: '#9999bb', marginLeft: 3 },
-  chartCard: { backgroundColor: '#1e1e30', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#2e2e44', overflow: 'hidden' },
+  chartCard: { backgroundColor: '#1e1e30', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#2e2e44' },
   chartTitle: { fontFamily: 'Nunito_700Bold', fontSize: 17, color: '#fff' },
   footer: { paddingHorizontal: 24, paddingBottom: 32 },
   startBtn: { borderRadius: 18, height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   startBtnText: { fontFamily: 'Nunito_700Bold', fontSize: 18, color: '#fff' },
-  
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
   modalCard: { backgroundColor: '#1e1e30', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#2e2e44' },
   modalTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, color: '#fff', marginBottom: 20 },
   inputWrap: { marginBottom: 16 },
   modalLabel: { fontFamily: 'Nunito_600SemiBold', fontSize: 13, color: '#9999bb', marginBottom: 8 },
-  modalInput: { backgroundColor: '#13131f', borderRadius: 12, padding: 14, fontFamily: 'Nunito_600SemiBold', fontSize: 16, color: '#e0e0ff', borderWidth: 1, borderColor: '#2e2e44' },
+  modalInput: { backgroundColor: '#13131f', borderRadius: 12, padding: 14, fontFamily: 'Nunito_600SemiBold', fontSize: 16, color: '#e0e0ff', borderWidth: 1, borderColor: '#2e2e44', justifyContent: 'center' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 10 },
   modalCancel: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#13131f', borderWidth: 1, borderColor: '#2e2e44' },
   modalCancelText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#9999bb' },

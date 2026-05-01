@@ -28,6 +28,13 @@ export interface UserProfile {
   updatedAt?: Timestamp;
 }
 
+export interface WeightLog {
+  id?: string;
+  weight: number;
+  date: string; // YYYY-MM-DD
+  createdAt?: Timestamp;
+}
+
 export interface ActivityLog {
   id?: string;
   type: 'Running' | 'Cycling' | 'Swimming' | 'Yoga' | 'Walking' | 'Dancing';
@@ -183,3 +190,44 @@ export const getActivitiesInRange = async (uid: string, startDate: string, endDa
     throw error;
   }
 };
+
+// --- Weight Functions ---
+
+export const addWeightLog = async (uid: string, weightData: Omit<WeightLog, 'createdAt'>) => {
+  try {
+    const weightRef = collection(db, 'users', uid, 'weightLogs');
+    const docRef = await addDoc(weightRef, {
+      ...weightData,
+      createdAt: Timestamp.now(),
+    });
+    
+    // Also update the current weight in the profile
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      weightKg: weightData.weight,
+      updatedAt: Timestamp.now(),
+    });
+
+    return { success: true, id: docRef.id };
+  } catch (error) {
+    console.error("Error adding weight log:", error);
+    throw error;
+  }
+};
+
+export const getWeightLogs = async (uid: string): Promise<WeightLog[]> => {
+  try {
+    const weightRef = collection(db, 'users', uid, 'weightLogs');
+    const q = query(weightRef, orderBy('date', 'asc'));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as WeightLog[];
+  } catch (error) {
+    console.error("Error fetching weight logs:", error);
+    throw error;
+  }
+};
+

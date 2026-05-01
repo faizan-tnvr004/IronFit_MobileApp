@@ -48,15 +48,22 @@ export default function ProfileSetupScreen() {
     setErrorMsg('');
 
     try {
+      const weightVal = parseFloat(weight);
       await createUserProfile(user.uid, {
         name,
         email: user.email || '',
         age: parseInt(age),
         heightCm: parseFloat(height),
-        weightKg: parseFloat(weight),
+        weightKg: weightVal,
         gender,
         fitnessGoal: goal,
         dailyStepGoal: stepGoal,
+      });
+
+      // Log the initial weight to the trend graph
+      await addWeightLog(user.uid, {
+        weight: weightVal,
+        date: new Date().toISOString().split('T')[0]
       });
       
       await refreshProfile();
