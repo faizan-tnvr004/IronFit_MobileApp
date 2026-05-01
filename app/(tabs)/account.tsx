@@ -1,6 +1,7 @@
 // app/(tabs)/account.tsx — IronFit My Account Screen
 
 import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   StatusBar,
   TextInput,
   Modal,
+  Alert,
 } from 'react-native';
 import {
   useFonts,
@@ -51,9 +53,17 @@ const FIELD_CONFIG: { key: FieldKey; label: string }[] = [
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AccountScreen() {
+  const router = useRouter();
   const [profile, setProfile] = useState<UserProfile>(INITIAL_PROFILE);
   const [editingField, setEditingField] = useState<FieldKey | null>(null);
   const [editValue, setEditValue] = useState('');
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: () => router.replace('/login') },
+    ]);
+  };
 
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
@@ -167,7 +177,7 @@ export default function AccountScreen() {
         </View>
 
         {/* Log Out Button */}
-        <TouchableOpacity style={s.logoutBtn} activeOpacity={0.7}>
+        <TouchableOpacity style={s.logoutBtn} activeOpacity={0.7} onPress={handleLogout}>
           <FontAwesome
             name="sign-out"
             size={18}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, StatusBar, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, StatusBar, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { LineChart } from 'react-native-chart-kit';
@@ -46,7 +46,7 @@ export default function YogaScreen() {
         </View>
       </View>
       <View style={s.footer}>
-        <TouchableOpacity style={[s.startBtn, { backgroundColor: '#EC4899' }]}>
+        <TouchableOpacity style={[s.startBtn, { backgroundColor: '#EC4899' }]} onPress={() => Alert.alert('Coming Soon', 'This functionality is not yet defined.')}>
           <FontAwesome name="play" size={16} color="#fff" style={{ marginRight: 10 }} />
           <Text style={s.startBtnText}>Start Yoga</Text>
         </TouchableOpacity>
