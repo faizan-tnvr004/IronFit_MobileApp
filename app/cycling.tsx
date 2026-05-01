@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView,
-  StatusBar, TouchableOpacity, Dimensions, Alert,
+  StatusBar, TouchableOpacity, Dimensions, Alert, Modal, TextInput, ActivityIndicator
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
@@ -10,20 +10,116 @@ import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
+import { useAuth } from '@/context/AuthContext';
+import { addActivityLog, getActivitiesInRange, calculateCalories, ActivityLog } from '@/services/firestoreService';
+import { useActivities } from '@/context/ActivityContext';
 
 const W = Dimensions.get('window').width;
 
-const weekData = {
-  labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-  datasets: [{ data: [8, 12, 10, 15, 14, 22, 18], strokeWidth: 2 }],
-};
-
 export default function CyclingScreen() {
   const router = useRouter();
+  const { user, userProfile } = useAuth();
+  const { refreshActivities } = useActivities();
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
+
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const [showModal, setShowModal] = useState(false);
+  const [duration, setDuration] = useState('');
+  const [distance, setDistance] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, [user]);
+
+  const fetchData = async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      const today = new Date();
+      const weekAgo = new Date();
+      weekAgo.setDate(today.getDate() - 6);
+      
+      const d1 = weekAgo.toISOString().split('T')[0];
+      const d2 = today.toISOString().split('T')[0];
+      
+      const data = await getActivitiesInRange(user.uid, d1, d2);
+      const activityLogs = data.filter(a => a.type === 'Cycling');
+      setLogs(activityLogs);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogActivity = async () => {
+    if (!duration || !distance || !date) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    if (!user || !userProfile) return;
+
+    setIsSubmitting(true);
+    try {
+      const durNum = parseInt(duration);
+      const distNum = parseFloat(distance);
+      const calories = calculateCalories('Cycling', durNum, userProfile.weightKg);
+
+      await addActivityLog(user.uid, {
+        type: 'Cycling',
+        durationMin: durNum,
+        distance: distNum,
+        caloriesBurned: calories,
+        date: date,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      });
+
+      Alert.alert('Success', 'Activity logged successfully!');
+      setShowModal(false);
+      setDuration('');
+      setDistance('');
+      fetchData();
+      refreshActivities();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to log activity');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!fontsLoaded) return null;
+
+  const totalDistance = logs.reduce((sum, log) => sum + (log.distance || 0), 0);
+  const totalTime = logs.reduce((sum, log) => sum + log.durationMin, 0);
+  const totalCalories = logs.reduce((sum, log) => sum + log.caloriesBurned, 0);
+  const speed = totalTime > 0 ? (totalDistance / (totalTime / 60)).toFixed(1) : '0';
+
+  const chartData = [0, 0, 0, 0, 0, 0, 0];
+  const labels = ['6d', '5d', '4d', '3d', '2d', '1d', 'Today'];
+  
+  if (logs.length > 0) {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    logs.forEach(log => {
+      const logDate = new Date(log.date);
+      const diffTime = Math.abs(today.getTime() - logDate.getTime());
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays >= 0 && diffDays < 7) {
+        chartData[6 - diffDays] += (log.distance || 0);
+      }
+    });
+  }
+
+  const weekData = {
+    labels,
+    datasets: [{ data: chartData.some(d => d > 0) ? chartData : [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], strokeWidth: 2 }],
+  };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -36,55 +132,91 @@ export default function CyclingScreen() {
 
         <Text style={s.title}>Cycling</Text>
 
-        <View style={s.statsGrid}>
-          {[
-            { label: 'Distance',  value: '18.5', unit: 'km' },
-            { label: 'Speed',     value: '22.5', unit: 'km/h' },
-            { label: 'Calories',  value: '680',  unit: 'kcal' },
-            { label: 'Elevation', value: '185',  unit: 'm' },
-          ].map((stat) => (
-            <View key={stat.label} style={s.statCard}>
-              <Text style={s.statLabel}>{stat.label}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                <Text style={s.statValue}>{stat.value}</Text>
-                <Text style={s.statUnit}>{stat.unit}</Text>
-              </View>
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#22C55E" style={{ marginTop: 50 }} />
+        ) : (
+          <>
+            <View style={s.statsGrid}>
+              {[
+                { label: 'Distance (7d)', value: totalDistance.toFixed(1), unit: 'km' },
+                { label: 'Avg Speed',     value: speed, unit: 'km/h' },
+                { label: 'Calories',      value: totalCalories.toString(), unit: 'kcal' },
+                { label: 'Time',          value: totalTime.toString(), unit: 'min' },
+              ].map((stat) => (
+                <View key={stat.label} style={s.statCard}>
+                  <Text style={s.statLabel}>{stat.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                    <Text style={s.statValue}>{stat.value}</Text>
+                    <Text style={s.statUnit}>{stat.unit}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
 
-        <View style={s.chartCard}>
-          <Text style={s.chartTitle}>Cycling Progress</Text>
-          <LineChart
-            data={weekData}
-            width={W - 64}
-            height={180}
-            chartConfig={{
-              backgroundColor: '#1e1e30',
-              backgroundGradientFrom: '#1e1e30',
-              backgroundGradientTo: '#1e1e30',
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(34,197,94,${opacity})`,
-              labelColor: (opacity = 1) => `rgba(153,153,187,${opacity})`,
-              propsForDots: { r: '5', strokeWidth: '2', stroke: '#22C55E' },
-              propsForBackgroundLines: { stroke: '#2e2e44', strokeDasharray: '4' },
-              fillShadowGradientFrom: '#22C55E',
-              fillShadowGradientTo: 'transparent',
-              fillShadowGradientOpacity: 0.3,
-            }}
-            bezier
-            style={{ borderRadius: 12, marginTop: 8 }}
-            withShadow={false}
-          />
-        </View>
+            <View style={s.chartCard}>
+              <Text style={s.chartTitle}>Cycling Progress</Text>
+              <LineChart
+                data={weekData}
+                width={W - 64}
+                height={180}
+                chartConfig={{
+                  backgroundColor: '#1e1e30',
+                  backgroundGradientFrom: '#1e1e30',
+                  backgroundGradientTo: '#1e1e30',
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(34,197,94,${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(153,153,187,${opacity})`,
+                  propsForDots: { r: '4', strokeWidth: '2', stroke: '#22C55E' },
+                  propsForBackgroundLines: { stroke: '#2e2e44', strokeDasharray: '4' },
+                }}
+                bezier
+                style={{ borderRadius: 12, marginTop: 8 }}
+                withShadow={false}
+              />
+            </View>
+          </>
+        )}
       </View>
 
       <View style={s.footer}>
-        <TouchableOpacity style={s.startBtn} onPress={() => Alert.alert('Coming Soon', 'This functionality is not yet defined.')}>
-          <FontAwesome name="play" size={16} color="#fff" style={{ marginRight: 10 }} />
-          <Text style={s.startBtnText}>Start Cycling</Text>
+        <TouchableOpacity style={s.startBtn} onPress={() => setShowModal(true)}>
+          <FontAwesome name="plus" size={16} color="#fff" style={{ marginRight: 10 }} />
+          <Text style={s.startBtnText}>Log Activity</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal visible={showModal} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Log Cycling Session</Text>
+            
+            <View style={s.inputWrap}>
+              <Text style={s.modalLabel}>Date (YYYY-MM-DD)</Text>
+              <TextInput style={s.modalInput} value={date} onChangeText={setDate} placeholderTextColor="#666" />
+            </View>
+            
+            <View style={s.inputWrap}>
+              <Text style={s.modalLabel}>Duration (minutes)</Text>
+              <TextInput style={s.modalInput} value={duration} onChangeText={setDuration} keyboardType="numeric" placeholderTextColor="#666" />
+            </View>
+
+            <View style={s.inputWrap}>
+              <Text style={s.modalLabel}>Distance (km)</Text>
+              <TextInput style={s.modalInput} value={distance} onChangeText={setDistance} keyboardType="numeric" placeholderTextColor="#666" />
+            </View>
+
+            <View style={s.modalActions}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)} disabled={isSubmitting}>
+                <Text style={s.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.modalSave} onPress={handleLogActivity} disabled={isSubmitting}>
+                <Text style={s.modalSaveText}>{isSubmitting ? 'Saving...' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -102,6 +234,18 @@ const s = StyleSheet.create({
   chartCard: { backgroundColor: '#1e1e30', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#2e2e44' },
   chartTitle: { fontFamily: 'Nunito_700Bold', fontSize: 17, color: '#fff' },
   footer: { paddingHorizontal: 24, paddingBottom: 32 },
-  startBtn: { backgroundColor: '#F97316', borderRadius: 18, height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  startBtn: { backgroundColor: '#22C55E', borderRadius: 18, height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   startBtnText: { fontFamily: 'Nunito_700Bold', fontSize: 18, color: '#fff' },
+  
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
+  modalCard: { backgroundColor: '#1e1e30', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#2e2e44' },
+  modalTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, color: '#fff', marginBottom: 20 },
+  inputWrap: { marginBottom: 16 },
+  modalLabel: { fontFamily: 'Nunito_600SemiBold', fontSize: 13, color: '#9999bb', marginBottom: 8 },
+  modalInput: { backgroundColor: '#13131f', borderRadius: 12, padding: 14, fontFamily: 'Nunito_600SemiBold', fontSize: 16, color: '#e0e0ff', borderWidth: 1, borderColor: '#2e2e44' },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 10 },
+  modalCancel: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#13131f', borderWidth: 1, borderColor: '#2e2e44' },
+  modalCancelText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#9999bb' },
+  modalSave: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#22C55E' },
+  modalSaveText: { fontFamily: 'Nunito_700Bold', fontSize: 14, color: '#fff' },
 });

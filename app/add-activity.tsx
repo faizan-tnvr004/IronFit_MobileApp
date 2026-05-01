@@ -8,7 +8,6 @@ import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
-import { useActivities } from '@/context/ActivityContext';
 
 const ACTIVITIES = [
   { name: 'Walking',  desc: 'Low impact cardio',        kcal: '~150 kcal/hour', icon: 'male',        color: '#F97316', route: '/walking',  duration: '30 min', calories: '150 kcal' },
@@ -21,22 +20,12 @@ const ACTIVITIES = [
 
 export default function AddActivityScreen() {
   const router = useRouter();
-  const { addActivity } = useActivities();
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
   if (!fontsLoaded) return null;
 
   const handleSelect = (item: typeof ACTIVITIES[0]) => {
-    addActivity({
-      id: Date.now().toString(),
-      name: item.name,
-      duration: item.duration,
-      calories: item.calories,
-      icon: item.icon,
-      color: item.color,
-      route: item.route,
-    });
     router.push(item.route as any);
   };
 

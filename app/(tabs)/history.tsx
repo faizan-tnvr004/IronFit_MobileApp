@@ -1,47 +1,82 @@
-// app/(tabs)/history.tsx — IronFit History/Calendar Screen
-
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useFonts, Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
+import { useAuth } from '@/context/AuthContext';
+import { getAllActivities, getActivitiesByDate, ActivityLog } from '@/services/firestoreService';
 
-type Activity = {
-  id: string; type: 'Running' | 'Cycling' | 'Swimming' | 'Yoga' | 'Walking';
-  duration: number; calories: number; distance?: number; time: string;
-};
-
-const ICONS: Record<string, string> = { Running: '🏃', Cycling: '🚴', Swimming: '🏊', Yoga: '🧘', Walking: '🚶' };
-const COLORS: Record<string, string> = { Running: '#F97316', Cycling: '#22C55E', Swimming: '#3B82F6', Yoga: '#A855F7', Walking: '#EAB308' };
+const ICONS: Record<string, string> = { Running: '🏃', Cycling: '🚴', Swimming: '🏊', Yoga: '🧘', Walking: '🚶', Dancing: '💃' };
+const COLORS: Record<string, string> = { Running: '#F97316', Cycling: '#22C55E', Swimming: '#3B82F6', Yoga: '#A855F7', Walking: '#EAB308', Dancing: '#A855F7' };
 const TODAY = new Date().toISOString().split('T')[0];
 
-const DATA: Record<string, Activity[]> = {
-  [TODAY]: [
-    { id: '1', type: 'Running', duration: 25, calories: 220, distance: 3.2, time: '07:00 AM' },
-    { id: '2', type: 'Cycling', duration: 45, calories: 380, distance: 12.5, time: '05:30 PM' },
-  ],
-  '2026-04-23': [{ id: '3', type: 'Swimming', duration: 40, calories: 320, time: '06:00 AM' }],
-  '2026-04-22': [
-    { id: '4', type: 'Yoga', duration: 60, calories: 180, time: '08:00 AM' },
-    { id: '5', type: 'Walking', duration: 30, calories: 120, distance: 2.8, time: '07:00 PM' },
-  ],
-  '2026-04-20': [{ id: '6', type: 'Running', duration: 35, calories: 310, distance: 4.5, time: '06:30 AM' }],
-};
-
 export default function HistoryScreen() {
+  const { user } = useAuth();
   const [sel, setSel] = useState(TODAY);
-  const [fontsLoaded] = useFonts({ Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold });
-  if (!fontsLoaded) return null;
+  const [allActivities, setAllActivities] = useState<ActivityLog[]>([]);
+  const [dayActivities, setDayActivities] = useState<ActivityLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDayLoading, setIsDayLoading] = useState(false);
 
-  const acts = DATA[sel] ?? [];
-  const totalCal = acts.reduce((s, a) => s + a.calories, 0);
-  const totalMin = acts.reduce((s, a) => s + a.duration, 0);
-  const totalKm = acts.reduce((s, a) => s + (a.distance ?? 0), 0);
+  const [fontsLoaded] = useFonts({ Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold });
+
+  useEffect(() => {
+    if (user) {
+      fetchAllActivities();
+      fetchDayActivities(sel);
+    }
+  }, [user]);
+
+  const fetchAllActivities = async () => {
+    if (!user) return;
+    try {
+      const data = await getAllActivities(user.uid);
+      setAllActivities(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchDayActivities = async (date: string) => {
+    if (!user) return;
+    setIsDayLoading(true);
+    try {
+      const data = await getActivitiesByDate(user.uid, date);
+      setDayActivities(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDayLoading(false);
+    }
+  };
+
+  const handleDayPress = (day: any) => {
+    setSel(day.dateString);
+    fetchDayActivities(day.dateString);
+  };
+
+  if (!fontsLoaded || isLoading) return <View style={s.screen}><ActivityIndicator size="large" color="#F97316" style={{marginTop: 100}} /></View>;
+
+  const totalCal = dayActivities.reduce((s, a) => s + a.caloriesBurned, 0);
+  const totalMin = dayActivities.reduce((s, a) => s + a.durationMin, 0);
+  const totalKm = dayActivities.reduce((s, a) => s + (a.distance ?? 0), 0);
 
   const markedDates: Record<string, any> = {};
-  Object.keys(DATA).forEach(d => { markedDates[d] = { marked: true, dotColor: '#F97316' }; });
+  allActivities.forEach(a => {
+    markedDates[a.date] = { marked: true, dotColor: '#F97316' };
+  });
   markedDates[sel] = { ...(markedDates[sel] || {}), selected: true, selectedColor: '#F97316', selectedTextColor: '#fff' };
 
   const displayDate = new Date(sel + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  // Monthly summary (for the month of the selected date)
+  const selMonth = sel.split('-')[1];
+  const monthActivities = allActivities.filter(a => a.date.split('-')[1] === selMonth);
+  const monthWorkouts = monthActivities.length;
+  const monthCal = monthActivities.reduce((s, a) => s + a.caloriesBurned, 0);
+  const monthKm = monthActivities.reduce((s, a) => s + (a.distance ?? 0), 0);
+  const monthName = new Date(sel + 'T00:00:00').toLocaleDateString('en-US', { month: 'long' });
 
   return (
     <View style={s.screen}>
@@ -57,9 +92,9 @@ export default function HistoryScreen() {
         {/* Calendar */}
         <View style={s.calWrap}>
           <Calendar
-            current={TODAY}
+            current={sel}
             markedDates={markedDates}
-            onDayPress={(day: any) => setSel(day.dateString)}
+            onDayPress={handleDayPress}
             theme={{
               backgroundColor: '#1e1e30', calendarBackground: '#1e1e30',
               textSectionTitleColor: '#9999bb', selectedDayBackgroundColor: '#F97316',
@@ -76,23 +111,27 @@ export default function HistoryScreen() {
         {/* Day header */}
         <View style={s.dayHead}>
           <Text style={s.dayTitle}>{displayDate}</Text>
-          {acts.length > 0 && (
-            <View style={s.statsRow}>
-              {[{ v: totalCal, l: 'kcal' }, { v: totalMin, l: 'min' }, { v: totalKm.toFixed(1), l: 'km' }].map((it, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && <View style={s.div} />}
-                  <View style={s.statCol}>
-                    <Text style={s.statVal}>{it.v}</Text>
-                    <Text style={s.statLbl}>{it.l}</Text>
-                  </View>
-                </React.Fragment>
-              ))}
-            </View>
+          {isDayLoading ? (
+            <ActivityIndicator size="small" color="#F97316" />
+          ) : (
+            dayActivities.length > 0 && (
+              <View style={s.statsRow}>
+                {[{ v: totalCal, l: 'kcal' }, { v: totalMin, l: 'min' }, { v: totalKm.toFixed(1), l: 'km' }].map((it, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <View style={s.div} />}
+                    <View style={s.statCol}>
+                      <Text style={s.statVal}>{it.v}</Text>
+                      <Text style={s.statLbl}>{it.l}</Text>
+                    </View>
+                  </React.Fragment>
+                ))}
+              </View>
+            )
           )}
         </View>
 
         {/* Activity list */}
-        {acts.length === 0 ? (
+        {!isDayLoading && dayActivities.length === 0 ? (
           <View style={s.empty}>
             <Text style={{ fontSize: 48, marginBottom: 12 }}>🌙</Text>
             <Text style={s.emptyT}>Rest Day</Text>
@@ -100,17 +139,17 @@ export default function HistoryScreen() {
           </View>
         ) : (
           <View style={s.list}>
-            {acts.map(a => (
+            {dayActivities.map(a => (
               <View key={a.id} style={s.row}>
                 <View style={[s.icon, { backgroundColor: COLORS[a.type] + '22' }]}>
                   <Text style={{ fontSize: 22 }}>{ICONS[a.type]}</Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={s.actName}>{a.type}</Text>
-                  <Text style={s.actMeta}>{a.duration} min{a.distance ? `  •  ${a.distance} km` : ''} • {a.time}</Text>
+                  <Text style={s.actMeta}>{a.durationMin} min{a.distance ? `  •  ${a.distance} km` : ''} • {a.time}</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={[s.kcal, { color: COLORS[a.type] }]}>{a.calories}</Text>
+                  <Text style={[s.kcal, { color: COLORS[a.type] }]}>{a.caloriesBurned}</Text>
                   <Text style={s.kcalLbl}>kcal</Text>
                 </View>
               </View>
@@ -120,9 +159,9 @@ export default function HistoryScreen() {
 
         {/* Monthly summary */}
         <View style={s.summaryCard}>
-          <Text style={s.summaryTitle}>April Summary</Text>
+          <Text style={s.summaryTitle}>{monthName} Summary</Text>
           <View style={s.summaryRow}>
-            {[{ v: '12', l: 'Workouts' }, { v: '2,450', l: 'kcal burned' }, { v: '38.2', l: 'km total' }].map((it, i) => (
+            {[{ v: monthWorkouts.toString(), l: 'Workouts' }, { v: monthCal.toLocaleString(), l: 'kcal burned' }, { v: monthKm.toFixed(1), l: 'km total' }].map((it, i) => (
               <View key={i} style={{ alignItems: 'center' }}>
                 <Text style={s.sumVal}>{it.v}</Text>
                 <Text style={s.sumLbl}>{it.l}</Text>

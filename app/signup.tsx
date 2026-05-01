@@ -10,6 +10,7 @@ import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -19,11 +20,31 @@ export default function SignupScreen() {
   const [confirm, setConfirm] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const { signUp, isLoading } = useAuth();
 
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
   if (!fontsLoaded) return null;
+
+  const handleSignup = async () => {
+    if (!name || !email || !password || !confirm) {
+      setErrorMsg('Please fill in all fields');
+      return;
+    }
+    if (password !== confirm) {
+      setErrorMsg('Passwords do not match');
+      return;
+    }
+    setErrorMsg('');
+    try {
+      await signUp(email, password);
+      // Navigation is handled automatically by the AuthGate in _layout.tsx
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to sign up');
+    }
+  };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -39,6 +60,8 @@ export default function SignupScreen() {
           </View>
 
           <Text style={s.heading}>Create Account</Text>
+
+          {errorMsg ? <Text style={s.errorText}>{errorMsg}</Text> : null}
 
           {/* Avatar Picker */}
           <View style={s.avatarWrap}>
@@ -79,8 +102,8 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={s.createBtn} onPress={() => router.replace('/(tabs)')}>
-            <Text style={s.createBtnText}>Create Account</Text>
+          <TouchableOpacity style={s.createBtn} onPress={handleSignup} disabled={isLoading}>
+            <Text style={s.createBtnText}>{isLoading ? 'Creating...' : 'Create Account'}</Text>
           </TouchableOpacity>
 
           <View style={s.loginRow}>
@@ -102,6 +125,7 @@ const s = StyleSheet.create({
   logoWrap: { alignItems: 'center', marginBottom: 16 },
   logoBox: { width: 80, height: 80, borderRadius: 24, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center' },
   heading: { fontFamily: 'Nunito_800ExtraBold', fontSize: 28, color: '#fff', textAlign: 'center', marginBottom: 28 },
+  errorText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#ff4d4d', marginBottom: 16, textAlign: 'center' },
   avatarWrap: { alignSelf: 'center', marginBottom: 28, position: 'relative' },
   avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#1e1e30', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2e2e44' },
   avatarPlus: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center' },

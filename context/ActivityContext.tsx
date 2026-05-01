@@ -1,43 +1,41 @@
-import React, { createContext, useContext, useState } from 'react';
-
-export type Activity = {
-  id: string;
-  name: string;
-  duration: string;
-  calories: string;
-  icon: string;
-  color: string;
-  route: string;
-};
-
-const DEFAULT_ACTIVITIES: Activity[] = [
-  { id: '1', name: 'Running', duration: '25 min', calories: '220 kcal', icon: 'street-view', color: '#F97316', route: '/running' },
-  { id: '2', name: 'Cycling', duration: '45 min', calories: '380 kcal', icon: 'bicycle', color: '#22C55E', route: '/cycling' },
-];
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import { getActivitiesByDate, ActivityLog } from '../services/firestoreService';
 
 type ActivityContextType = {
-  activities: Activity[];
-  addActivity: (a: Activity) => void;
+  activities: ActivityLog[];
+  refreshActivities: () => Promise<void>;
 };
 
 const ActivityContext = createContext<ActivityContextType>({
-  activities: DEFAULT_ACTIVITIES,
-  addActivity: () => {},
+  activities: [],
+  refreshActivities: async () => {},
 });
 
 export function ActivityProvider({ children }: { children: React.ReactNode }) {
-  const [activities, setActivities] = useState<Activity[]>(DEFAULT_ACTIVITIES);
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const { user } = useAuth();
 
-  const addActivity = (a: Activity) => {
-    setActivities(prev => {
-      const exists = prev.find(x => x.name === a.name);
-      if (exists) return prev;
-      return [...prev, a];
-    });
+  const refreshActivities = async () => {
+    if (!user) {
+      setActivities([]);
+      return;
+    }
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const todayLogs = await getActivitiesByDate(user.uid, today);
+      setActivities(todayLogs);
+    } catch (error) {
+      console.error("Failed to fetch today's activities", error);
+    }
   };
 
+  useEffect(() => {
+    refreshActivities();
+  }, [user]);
+
   return (
-    <ActivityContext.Provider value={{ activities, addActivity }}>
+    <ActivityContext.Provider value={{ activities, refreshActivities }}>
       {children}
     </ActivityContext.Provider>
   );

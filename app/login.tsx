@@ -9,17 +9,34 @@ import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const { signIn, isLoading } = useAuth();
 
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
   if (!fontsLoaded) return null;
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setErrorMsg('Please fill in all fields');
+      return;
+    }
+    setErrorMsg('');
+    try {
+      await signIn(email, password);
+      // Navigation is handled automatically by the AuthGate in _layout.tsx
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to login');
+    }
+  };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -38,6 +55,8 @@ export default function LoginScreen() {
           {/* Heading */}
           <Text style={s.heading}>Welcome Back</Text>
           <Text style={s.sub}>Sign in to continue your fitness journey</Text>
+
+          {errorMsg ? <Text style={s.errorText}>{errorMsg}</Text> : null}
 
           {/* Email */}
           <View style={s.inputWrap}>
@@ -73,8 +92,8 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           {/* Login Button */}
-          <TouchableOpacity style={s.loginBtn} onPress={() => router.replace('/(tabs)')}>
-            <Text style={s.loginBtnText}>Login</Text>
+          <TouchableOpacity style={s.loginBtn} onPress={handleLogin} disabled={isLoading}>
+            <Text style={s.loginBtnText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
           </TouchableOpacity>
 
           {/* Sign up */}
@@ -100,6 +119,7 @@ const s = StyleSheet.create({
   logoText: { fontFamily: 'Nunito_800ExtraBold', fontSize: 24, color: '#fff' },
   heading: { fontFamily: 'Nunito_800ExtraBold', fontSize: 30, color: '#fff', marginBottom: 8 },
   sub: { fontFamily: 'Nunito_400Regular', fontSize: 14, color: '#9999bb', marginBottom: 32 },
+  errorText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#ff4d4d', marginBottom: 16, textAlign: 'center' },
   inputWrap: { position: 'relative', marginBottom: 16 },
   input: {
     backgroundColor: '#1e1e30',
