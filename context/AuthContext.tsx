@@ -30,8 +30,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
       if (currentUser) {
+        setIsLoading(true); // Ensure we show loading while fetching profile
+        setUser(currentUser);
         try {
           const profile = await getUserProfile(currentUser.uid);
           setUserProfile(profile);
@@ -39,6 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.error("Failed to load profile on auth state change", error);
         }
       } else {
+        setUser(null);
         setUserProfile(null);
       }
       setIsLoading(false);
@@ -58,8 +60,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, pass);
-    } finally {
+      // Don't set isLoading(false) here, let onAuthStateChanged handle it
+    } catch (error) {
       setIsLoading(false);
+      throw error;
     }
   };
 
@@ -67,8 +71,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(true);
     try {
       await createUserWithEmailAndPassword(auth, email, pass);
-    } finally {
+      // Don't set isLoading(false) here, let onAuthStateChanged handle it
+    } catch (error) {
       setIsLoading(false);
+      throw error;
     }
   };
 

@@ -34,6 +34,7 @@ export default function RunningScreen() {
   const [distance, setDistance] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -97,9 +98,28 @@ export default function RunningScreen() {
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
+    if (event.type === 'dismissed') {
+      setShowDatePicker(false);
+      return;
+    }
+
     const currentDate = selectedDate || date;
-    setShowDatePicker(Platform.OS === 'ios');
-    setDate(currentDate);
+    
+    if (Platform.OS === 'android') {
+      if (pickerMode === 'date') {
+        // Date selected, now show time picker
+        setDate(currentDate);
+        setPickerMode('time');
+      } else {
+        // Time selected, we're done
+        setShowDatePicker(false);
+        setDate(currentDate);
+        setPickerMode('date'); // Reset for next time
+      }
+    } else {
+      // iOS handles datetime mode naturally
+      setDate(currentDate);
+    }
   };
 
   if (!fontsLoaded) return null;
@@ -110,7 +130,7 @@ export default function RunningScreen() {
   const totalCalories = logs.reduce((sum, log) => sum + log.caloriesBurned, 0);
   const pace = totalDistance > 0 ? (totalTime / totalDistance).toFixed(2) : '0';
 
-  // Chart data (last 7 days)
+  // Chart data
   const chartData = [0, 0, 0, 0, 0, 0, 0];
   const labels = ['6d', '5d', '4d', '3d', '2d', '1d', 'Today'];
   
@@ -118,12 +138,14 @@ export default function RunningScreen() {
     const today = new Date();
     today.setHours(0,0,0,0);
     logs.forEach(log => {
-      const logDate = new Date(log.date);
-      const diffTime = Math.abs(today.getTime() - logDate.getTime());
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays >= 0 && diffDays < 7) {
-        chartData[6 - diffDays] += (log.distance || 0);
-      }
+      try {
+        const logDate = new Date(log.date + 'T00:00:00');
+        const diffTime = Math.abs(today.getTime() - logDate.getTime());
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays < 7) {
+          chartData[6 - diffDays] += (log.distance || 0);
+        }
+      } catch (e) {}
     });
   }
 
@@ -190,7 +212,7 @@ export default function RunningScreen() {
       </View>
 
       <View style={s.footer}>
-        <TouchableOpacity style={s.startBtn} onPress={() => setShowModal(true)}>
+        <TouchableOpacity style={s.startBtn} onPress={() => { setPickerMode('date'); setShowModal(true); }}>
           <FontAwesome name="plus" size={16} color="#fff" style={{ marginRight: 10 }} />
           <Text style={s.startBtnText}>Log Activity</Text>
         </TouchableOpacity>
@@ -204,13 +226,13 @@ export default function RunningScreen() {
             
             <View style={s.inputWrap}>
               <Text style={s.modalLabel}>Activity Date & Time</Text>
-              <TouchableOpacity style={s.modalInput} onPress={() => setShowDatePicker(true)}>
+              <TouchableOpacity style={s.modalInput} onPress={() => { setPickerMode('date'); setShowDatePicker(true); }}>
                 <Text style={{ color: '#fff' }}>{date.toLocaleString()}</Text>
               </TouchableOpacity>
               {showDatePicker && (
                 <DateTimePicker
                   value={date}
-                  mode="datetime"
+                  mode={Platform.OS === 'ios' ? 'datetime' : pickerMode}
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={onDateChange}
                   maximumDate={new Date()}

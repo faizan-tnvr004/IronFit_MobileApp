@@ -21,7 +21,7 @@ import {
 } from '@expo-google-fonts/nunito';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/context/AuthContext';
-import { updateUserProfile, UserProfile } from '@/services/firestoreService';
+import { updateUserProfile, UserProfile, addWeightLog } from '@/services/firestoreService';
 
 type FieldKey = keyof UserProfile;
 
@@ -84,6 +84,14 @@ export default function AccountScreen() {
       }
       
       await updateUserProfile(user.uid, { [editingField]: val });
+      
+      if (editingField === 'weightKg') {
+        await addWeightLog(user.uid, {
+          weight: val,
+          date: new Date().toISOString().split('T')[0]
+        });
+      }
+
       await refreshProfile();
       setEditingField(null);
     } catch (err) {

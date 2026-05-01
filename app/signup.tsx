@@ -91,7 +91,7 @@ export default function SignupScreen() {
           <View style={s.inputWrap}>
             <TextInput style={[s.input, { paddingRight: 50 }]} placeholder="Password"
               placeholderTextColor="#9999bb" value={password} onChangeText={setPassword}
-              secureTextEntry={!showPass} />
+              secureTextEntry={!showPass} autoCapitalize="none" />
             <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPass(!showPass)}>
               <FontAwesome name={showPass ? 'eye' : 'eye-slash'} size={18} color="#9999bb" />
             </TouchableOpacity>
@@ -100,7 +100,7 @@ export default function SignupScreen() {
           <View style={s.inputWrap}>
             <TextInput style={[s.input, { paddingRight: 50 }]} placeholder="Confirm Password"
               placeholderTextColor="#9999bb" value={confirm} onChangeText={setConfirm}
-              secureTextEntry={!showConfirm} />
+              secureTextEntry={!showConfirm} autoCapitalize="none" />
             <TouchableOpacity style={s.eyeBtn} onPress={() => setShowConfirm(!showConfirm)}>
               <FontAwesome name={showConfirm ? 'eye' : 'eye-slash'} size={18} color="#9999bb" />
             </TouchableOpacity>

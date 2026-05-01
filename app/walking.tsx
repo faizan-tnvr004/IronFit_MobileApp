@@ -33,6 +33,7 @@ export default function WalkingScreen() {
   const [distance, setDistance] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -46,13 +47,8 @@ export default function WalkingScreen() {
       const today = new Date();
       const weekAgo = new Date();
       weekAgo.setDate(today.getDate() - 6);
-      
-      const d1 = weekAgo.toISOString().split('T')[0];
-      const d2 = today.toISOString().split('T')[0];
-      
-      const data = await getActivitiesInRange(user.uid, d1, d2);
-      const activityLogs = data.filter(a => a.type === 'Walking');
-      setLogs(activityLogs);
+      const data = await getActivitiesInRange(user.uid, weekAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]);
+      setLogs(data.filter(a => a.type === 'Walking'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -96,9 +92,23 @@ export default function WalkingScreen() {
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
+    if (event.type === 'dismissed') {
+      setShowDatePicker(false);
+      return;
+    }
     const currentDate = selectedDate || date;
-    setShowDatePicker(Platform.OS === 'ios');
-    setDate(currentDate);
+    if (Platform.OS === 'android') {
+      if (pickerMode === 'date') {
+        setDate(currentDate);
+        setPickerMode('time');
+      } else {
+        setShowDatePicker(false);
+        setDate(currentDate);
+        setPickerMode('date');
+      }
+    } else {
+      setDate(currentDate);
+    }
   };
 
   if (!fontsLoaded) return null;
@@ -110,17 +120,18 @@ export default function WalkingScreen() {
 
   const chartData = [0, 0, 0, 0, 0, 0, 0];
   const labels = ['6d', '5d', '4d', '3d', '2d', '1d', 'Today'];
-  
   if (logs.length > 0) {
     const today = new Date();
     today.setHours(0,0,0,0);
     logs.forEach(log => {
-      const logDate = new Date(log.date);
-      const diffTime = Math.abs(today.getTime() - logDate.getTime());
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays >= 0 && diffDays < 7) {
-        chartData[6 - diffDays] += Math.round((log.distance || 0) * 1312);
-      }
+      try {
+        const logDate = new Date(log.date + 'T00:00:00');
+        const diffTime = Math.abs(today.getTime() - logDate.getTime());
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays < 7) {
+          chartData[6 - diffDays] += Math.round((log.distance || 0) * 1312);
+        }
+      } catch (e) {}
     });
   }
 
@@ -132,24 +143,19 @@ export default function WalkingScreen() {
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#13131f" />
-
       <View style={s.container}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <FontAwesome name="chevron-left" size={16} color="#fff" />
-        </TouchableOpacity>
-
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}><FontAwesome name="chevron-left" size={16} color="#fff" /></TouchableOpacity>
         <Text style={s.title}>Walking</Text>
-
         {isLoading ? (
           <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 50 }} />
         ) : (
           <>
             <View style={s.statsGrid}>
               {[
-                { label: 'Steps (7d)',    value: totalSteps.toLocaleString(), unit: '' },
-                { label: 'Distance',      value: totalDistance.toFixed(1), unit: 'km' },
-                { label: 'Calories',      value: totalCalories.toString(), unit: 'kcal' },
-                { label: 'Active Time',   value: totalTime.toString(), unit: 'min' },
+                { label: 'Steps (7d)', value: totalSteps.toLocaleString(), unit: '' },
+                { label: 'Distance', value: totalDistance.toFixed(1), unit: 'km' },
+                { label: 'Calories', value: totalCalories.toString(), unit: 'kcal' },
+                { label: 'Active Time', value: totalTime.toString(), unit: 'min' },
               ].map((stat) => (
                 <View key={stat.label} style={s.statCard}>
                   <Text style={s.statLabel}>{stat.label}</Text>
@@ -160,82 +166,59 @@ export default function WalkingScreen() {
                 </View>
               ))}
             </View>
-
             <View style={s.chartCard}>
               <Text style={s.chartTitle}>Weekly Steps</Text>
               <LineChart
-                data={weekData}
-                width={W - 64}
-                height={180}
+                data={weekData} width={W - 64} height={180}
                 chartConfig={{
-                  backgroundColor: '#1e1e30',
-                  backgroundGradientFrom: '#1e1e30',
-                  backgroundGradientTo: '#1e1e30',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(249,115,22,${opacity})`,
+                  backgroundColor: '#1e1e30', backgroundGradientFrom: '#1e1e30', backgroundGradientTo: '#1e1e30',
+                  decimalPlaces: 0, color: (opacity = 1) => `rgba(249,115,22,${opacity})`,
                   labelColor: (opacity = 1) => `rgba(153,153,187,${opacity})`,
                   propsForDots: { r: '4', strokeWidth: '2', stroke: '#F97316' },
                   propsForBackgroundLines: { stroke: '#2e2e44', strokeDasharray: '4' },
                 }}
-                bezier
-                style={{ borderRadius: 12, marginTop: 8 }}
-                withShadow={false}
+                bezier style={{ borderRadius: 12, marginTop: 8 }} withShadow={false}
               />
             </View>
           </>
         )}
       </View>
-
       <View style={s.footer}>
-        <TouchableOpacity style={s.startBtn} onPress={() => setShowModal(true)}>
-          <FontAwesome name="plus" size={16} color="#fff" style={{ marginRight: 10 }} />
-          <Text style={s.startBtnText}>Log Activity</Text>
+        <TouchableOpacity style={s.startBtn} onPress={() => { setPickerMode('date'); setShowModal(true); }}>
+          <FontAwesome name="plus" size={16} color="#fff" style={{ marginRight: 10 }} /><Text style={s.startBtnText}>Log Activity</Text>
         </TouchableOpacity>
       </View>
-
       <Modal visible={showModal} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>Log Walking Session</Text>
-            
             <View style={s.inputWrap}>
               <Text style={s.modalLabel}>Activity Date & Time</Text>
-              <TouchableOpacity style={s.modalInput} onPress={() => setShowDatePicker(true)}>
+              <TouchableOpacity style={s.modalInput} onPress={() => { setPickerMode('date'); setShowDatePicker(true); }}>
                 <Text style={{ color: '#fff' }}>{date.toLocaleString()}</Text>
               </TouchableOpacity>
               {showDatePicker && (
                 <DateTimePicker
-                  value={date}
-                  mode="datetime"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={onDateChange}
-                  maximumDate={new Date()}
+                  value={date} mode={Platform.OS === 'ios' ? 'datetime' : pickerMode}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={onDateChange} maximumDate={new Date()}
                 />
               )}
             </View>
-            
             <View style={s.inputWrap}>
               <Text style={s.modalLabel}>Duration (minutes)</Text>
               <TextInput style={s.modalInput} value={duration} onChangeText={setDuration} keyboardType="numeric" placeholderTextColor="#666" />
             </View>
-
             <View style={s.inputWrap}>
               <Text style={s.modalLabel}>Distance (km)</Text>
               <TextInput style={s.modalInput} value={distance} onChangeText={setDistance} keyboardType="numeric" placeholderTextColor="#666" />
             </View>
-
             <View style={s.modalActions}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)} disabled={isSubmitting}>
-                <Text style={s.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.modalSave} onPress={handleLogActivity} disabled={isSubmitting}>
-                <Text style={s.modalSaveText}>{isSubmitting ? 'Saving...' : 'Save'}</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)} disabled={isSubmitting}><Text style={s.modalCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={s.modalSave} onPress={handleLogActivity} disabled={isSubmitting}><Text style={s.modalSaveText}>{isSubmitting ? 'Saving...' : 'Save'}</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
@@ -255,7 +238,6 @@ const s = StyleSheet.create({
   footer: { paddingHorizontal: 24, paddingBottom: 32 },
   startBtn: { backgroundColor: '#F97316', borderRadius: 18, height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   startBtnText: { fontFamily: 'Nunito_700Bold', fontSize: 18, color: '#fff' },
-  
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
   modalCard: { backgroundColor: '#1e1e30', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#2e2e44' },
   modalTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, color: '#fff', marginBottom: 20 },

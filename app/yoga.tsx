@@ -32,6 +32,7 @@ export default function YogaScreen() {
   const [duration, setDuration] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -87,9 +88,23 @@ export default function YogaScreen() {
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
+    if (event.type === 'dismissed') {
+      setShowDatePicker(false);
+      return;
+    }
     const currentDate = selectedDate || date;
-    setShowDatePicker(Platform.OS === 'ios');
-    setDate(currentDate);
+    if (Platform.OS === 'android') {
+      if (pickerMode === 'date') {
+        setDate(currentDate);
+        setPickerMode('time');
+      } else {
+        setShowDatePicker(false);
+        setDate(currentDate);
+        setPickerMode('date');
+      }
+    } else {
+      setDate(currentDate);
+    }
   };
 
   if (!fontsLoaded) return null;
@@ -103,12 +118,14 @@ export default function YogaScreen() {
     const today = new Date();
     today.setHours(0,0,0,0);
     logs.forEach(log => {
-      const logDate = new Date(log.date);
-      const diffTime = Math.abs(today.getTime() - logDate.getTime());
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays >= 0 && diffDays < 7) {
-        chartData[6 - diffDays] += log.durationMin;
-      }
+      try {
+        const logDate = new Date(log.date + 'T00:00:00');
+        const diffTime = Math.abs(today.getTime() - logDate.getTime());
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays < 7) {
+          chartData[6 - diffDays] += log.durationMin;
+        }
+      } catch (e) {}
     });
   }
 
@@ -121,9 +138,7 @@ export default function YogaScreen() {
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#13131f" />
       <View style={s.container}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <FontAwesome name="chevron-left" size={16} color="#fff" />
-        </TouchableOpacity>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}><FontAwesome name="chevron-left" size={16} color="#fff" /></TouchableOpacity>
         <Text style={s.title}>Yoga</Text>
         {isLoading ? (
           <ActivityIndicator size="large" color="#A855F7" style={{ marginTop: 50 }} />
@@ -136,44 +151,39 @@ export default function YogaScreen() {
             <View style={s.chartCard}>
               <Text style={s.chartTitle}>Weekly Yoga (min)</Text>
               <LineChart
-                data={weekData}
-                width={W - 64}
-                height={180}
+                data={weekData} width={W - 64} height={180}
                 chartConfig={{
-                  backgroundColor: '#1e1e30',
-                  backgroundGradientFrom: '#1e1e30',
-                  backgroundGradientTo: '#1e1e30',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(168,85,247,${opacity})`,
+                  backgroundColor: '#1e1e30', backgroundGradientFrom: '#1e1e30', backgroundGradientTo: '#1e1e30',
+                  decimalPlaces: 0, color: (opacity = 1) => `rgba(168,85,247,${opacity})`,
                   labelColor: (opacity = 1) => `rgba(153,153,187,${opacity})`,
                   propsForDots: { r: '4', strokeWidth: '2', stroke: '#A855F7' },
                   propsForBackgroundLines: { stroke: '#2e2e44' },
                 }}
-                bezier
-                style={{ borderRadius: 12, marginTop: 8 }}
+                bezier style={{ borderRadius: 12, marginTop: 8 }}
               />
             </View>
           </>
         )}
       </View>
       <View style={s.footer}>
-        <TouchableOpacity style={[s.startBtn, { backgroundColor: '#A855F7' }]} onPress={() => setShowModal(true)}>
-          <FontAwesome name="plus" size={16} color="#fff" style={{ marginRight: 10 }} />
-          <Text style={s.startBtnText}>Log Activity</Text>
+        <TouchableOpacity style={[s.startBtn, { backgroundColor: '#A855F7' }]} onPress={() => { setPickerMode('date'); setShowDatePicker(true); setShowModal(true); }}>
+          <FontAwesome name="plus" size={16} color="#fff" style={{ marginRight: 10 }} /><Text style={s.startBtnText}>Log Activity</Text>
         </TouchableOpacity>
       </View>
-
       <Modal visible={showModal} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>Log Yoga Session</Text>
             <View style={s.inputWrap}>
               <Text style={s.modalLabel}>Activity Date & Time</Text>
-              <TouchableOpacity style={s.modalInput} onPress={() => setShowDatePicker(true)}>
+              <TouchableOpacity style={s.modalInput} onPress={() => { setPickerMode('date'); setShowDatePicker(true); }}>
                 <Text style={{ color: '#fff' }}>{date.toLocaleString()}</Text>
               </TouchableOpacity>
               {showDatePicker && (
-                <DateTimePicker value={date} mode="datetime" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={onDateChange} maximumDate={new Date()} />
+                <DateTimePicker
+                  value={date} mode={Platform.OS === 'ios' ? 'datetime' : pickerMode}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={onDateChange} maximumDate={new Date()}
+                />
               )}
             </View>
             <View style={s.inputWrap}>

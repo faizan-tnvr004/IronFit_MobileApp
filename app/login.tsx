@@ -94,6 +94,7 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPass}
+              autoCapitalize="none"
             />
             <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPass(!showPass)}>
               <FontAwesome name={showPass ? 'eye' : 'eye-slash'} size={18} color="#9999bb" />

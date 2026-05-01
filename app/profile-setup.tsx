@@ -11,7 +11,7 @@ import {
   Nunito_700Bold, Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
 import { useAuth } from '@/context/AuthContext';
-import { createUserProfile } from '@/services/firestoreService';
+import { createUserProfile, addWeightLog } from '@/services/firestoreService';
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
