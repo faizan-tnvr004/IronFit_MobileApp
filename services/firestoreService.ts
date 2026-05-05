@@ -58,6 +58,7 @@ export interface Workout {
   defaultDuration: string; // '30 min'
   defaultCalories: string; // '150 kcal'
   createdAt?: Timestamp;
+  isCustom?: boolean; // Flag to indicate user-created custom workout
 }
 
 // --- Helper: Calorie Calculation ---
@@ -288,6 +289,51 @@ export const deleteWorkout = async (workoutId: string) => {
     return { success: true };
   } catch (error) {
     console.error("Error deleting workout:", error);
+    throw error;
+  }
+};
+
+// --- Custom Workout Functions ---
+
+export const getCustomWorkouts = async (uid: string): Promise<Workout[]> => {
+  try {
+    const workoutsRef = collection(db, 'users', uid, 'customWorkouts');
+    const q = query(workoutsRef, orderBy('createdAt', 'asc'));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Workout[];
+  } catch (error) {
+    console.error("Error fetching custom workouts:", error);
+    return []; // Return empty instead of throwing to avoid breaking the app if rules aren't set
+  }
+};
+
+export const addCustomWorkout = async (uid: string, workoutData: Omit<Workout, 'id' | 'createdAt'>) => {
+  try {
+    const workoutsRef = collection(db, 'users', uid, 'customWorkouts');
+    const docRef = await addDoc(workoutsRef, {
+      ...workoutData,
+      isCustom: true,
+      createdAt: Timestamp.now(),
+    });
+    return { success: true, id: docRef.id };
+  } catch (error) {
+    console.error("Error adding custom workout:", error);
+    throw error;
+  }
+};
+
+export const deleteCustomWorkout = async (uid: string, workoutId: string) => {
+  try {
+    const workoutRef = doc(db, 'users', uid, 'customWorkouts', workoutId);
+    const { deleteDoc } = require('firebase/firestore');
+    await deleteDoc(workoutRef);
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting custom workout:", error);
     throw error;
   }
 };

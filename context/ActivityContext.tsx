@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { getActivitiesByDate, ActivityLog, getWorkouts, Workout } from '../services/firestoreService';
+import { getActivitiesByDate, ActivityLog, getWorkouts, getCustomWorkouts, Workout } from '../services/firestoreService';
 
 type ActivityContextType = {
   activities: ActivityLog[];
@@ -22,12 +22,16 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
   const refreshActivities = async () => {
     try {
       const fetchedWorkouts = await getWorkouts();
-      setWorkouts(fetchedWorkouts);
       
       if (!user) {
+        setWorkouts(fetchedWorkouts);
         setActivities([]);
         return;
       }
+      
+      const customWorkouts = await getCustomWorkouts(user.uid);
+      setWorkouts([...fetchedWorkouts, ...customWorkouts]);
+
       const today = new Date().toISOString().split('T')[0];
       const todayLogs = await getActivitiesByDate(user.uid, today);
       setActivities(todayLogs);
