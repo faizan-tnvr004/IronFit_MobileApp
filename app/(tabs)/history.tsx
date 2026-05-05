@@ -3,14 +3,15 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Activi
 import { Calendar } from 'react-native-calendars';
 import { useFonts, Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import { useAuth } from '@/context/AuthContext';
+import { useActivities } from '@/context/ActivityContext';
 import { getAllActivities, getActivitiesByDate, ActivityLog } from '@/services/firestoreService';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
-const ICONS: Record<string, string> = { Running: '🏃', Cycling: '🚴', Swimming: '🏊', Yoga: '🧘', Walking: '🚶', Dancing: '💃' };
-const COLORS: Record<string, string> = { Running: '#F97316', Cycling: '#22C55E', Swimming: '#3B82F6', Yoga: '#A855F7', Walking: '#EAB308', Dancing: '#A855F7' };
 const TODAY = new Date().toISOString().split('T')[0];
 
 export default function HistoryScreen() {
   const { user } = useAuth();
+  const { workouts } = useActivities();
   const [sel, setSel] = useState(TODAY);
   const [allActivities, setAllActivities] = useState<ActivityLog[]>([]);
   const [dayActivities, setDayActivities] = useState<ActivityLog[]>([]);
@@ -150,21 +151,27 @@ export default function HistoryScreen() {
           </View>
         ) : (
           <View style={s.list}>
-            {dayActivities.map(a => (
-              <View key={a.id} style={s.row}>
-                <View style={[s.icon, { backgroundColor: COLORS[a.type] + '22' }]}>
-                  <Text style={{ fontSize: 22 }}>{ICONS[a.type]}</Text>
+            {dayActivities.map(a => {
+              const workout = workouts.find(w => w.name === a.type);
+              const color = workout?.color || '#9999bb';
+              const icon = workout?.icon || 'circle';
+
+              return (
+                <View key={a.id} style={s.row}>
+                  <View style={[s.icon, { backgroundColor: color + '22' }]}>
+                    <FontAwesome name={icon as any} size={22} color={color} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 14 }}>
+                    <Text style={s.actName}>{a.type}</Text>
+                    <Text style={s.actMeta}>{a.durationMin} min{a.distance ? `  •  ${a.distance} km` : ''} • {a.time}</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={[s.kcal, { color: color }]}>{a.caloriesBurned}</Text>
+                    <Text style={s.kcalLbl}>kcal</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={s.actName}>{a.type}</Text>
-                  <Text style={s.actMeta}>{a.durationMin} min{a.distance ? `  •  ${a.distance} km` : ''} • {a.time}</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={[s.kcal, { color: COLORS[a.type] }]}>{a.caloriesBurned}</Text>
-                  <Text style={s.kcalLbl}>kcal</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 

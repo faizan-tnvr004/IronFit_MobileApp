@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
@@ -8,25 +8,21 @@ import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
-
-const ACTIVITIES = [
-  { name: 'Walking',  desc: 'Low impact cardio',        kcal: '~150 kcal/hour', icon: 'male',        color: '#F97316', route: '/walking',  duration: '30 min', calories: '150 kcal' },
-  { name: 'Running',  desc: 'High intensity cardio',    kcal: '~500 kcal/hour', icon: 'street-view', color: '#EF4444', route: '/running',  duration: '25 min', calories: '220 kcal' },
-  { name: 'Cycling',  desc: 'Endurance training',       kcal: '~400 kcal/hour', icon: 'bicycle',     color: '#22C55E', route: '/cycling',  duration: '45 min', calories: '380 kcal' },
-  { name: 'Dancing',  desc: 'Fun & energetic',          kcal: '~300 kcal/hour', icon: 'music',       color: '#A855F7', route: '/dancing',  duration: '60 min', calories: '420 kcal' },
-  { name: 'Swimming', desc: 'Full body workout',        kcal: '~450 kcal/hour', icon: 'tint',        color: '#3B82F6', route: '/swimming', duration: '45 min', calories: '580 kcal' },
-  { name: 'Yoga',     desc: 'Flexibility & mindfulness',kcal: '~200 kcal/hour', icon: 'heart',       color: '#EC4899', route: '/yoga',     duration: '45 min', calories: '200 kcal' },
-];
+import { useActivities } from '@/context/ActivityContext';
+import { Workout } from '@/services/firestoreService';
 
 export default function AddActivityScreen() {
   const router = useRouter();
+  const { workouts } = useActivities();
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
   if (!fontsLoaded) return null;
 
-  const handleSelect = (item: typeof ACTIVITIES[0]) => {
-    router.push(item.route as any);
+  const handleSelect = (item: Workout) => {
+    if (item.id) {
+      router.push(`/activity/${item.id}` as any);
+    }
   };
 
   return (
@@ -41,23 +37,27 @@ export default function AddActivityScreen() {
           </TouchableOpacity>
         </View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
-          <View style={s.grid}>
-            {ACTIVITIES.map((item) => (
-              <TouchableOpacity
-                key={item.name}
-                style={s.card}
-                onPress={() => handleSelect(item)}
-                activeOpacity={0.75}
-              >
-                <View style={[s.iconWrap, { backgroundColor: item.color + '22' }]}>
-                  <FontAwesome name={item.icon as any} size={22} color={item.color} />
-                </View>
-                <Text style={s.cardName}>{item.name}</Text>
-                <Text style={s.cardDesc}>{item.desc}</Text>
-                <Text style={[s.cardKcal, { color: item.color }]}>{item.kcal}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {workouts.length === 0 ? (
+            <ActivityIndicator size="large" color="#F97316" />
+          ) : (
+            <View style={s.grid}>
+              {workouts.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={s.card}
+                  onPress={() => handleSelect(item)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[s.iconWrap, { backgroundColor: item.color + '22' }]}>
+                    <FontAwesome name={item.icon as any} size={22} color={item.color} />
+                  </View>
+                  <Text style={s.cardName}>{item.name}</Text>
+                  <Text style={s.cardDesc}>{item.desc}</Text>
+                  <Text style={[s.cardKcal, { color: item.color }]}>{item.kcal}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </ScrollView>
       </View>
     </View>

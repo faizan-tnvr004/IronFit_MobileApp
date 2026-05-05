@@ -29,6 +29,13 @@ export default function LoginScreen() {
       setErrorMsg('Please fill in all fields');
       return;
     }
+    
+    // Admin bypass
+    if (email.toLowerCase() === 'admin' && password === 'khadijafaizan') {
+      router.push('/admin' as any);
+      return;
+    }
+
     setErrorMsg('');
     try {
       await signIn(email, password);

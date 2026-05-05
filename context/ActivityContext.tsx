@@ -1,32 +1,38 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { getActivitiesByDate, ActivityLog } from '../services/firestoreService';
+import { getActivitiesByDate, ActivityLog, getWorkouts, Workout } from '../services/firestoreService';
 
 type ActivityContextType = {
   activities: ActivityLog[];
+  workouts: Workout[];
   refreshActivities: () => Promise<void>;
 };
 
 const ActivityContext = createContext<ActivityContextType>({
   activities: [],
+  workouts: [],
   refreshActivities: async () => {},
 });
 
 export function ActivityProvider({ children }: { children: React.ReactNode }) {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
   const { user } = useAuth();
 
   const refreshActivities = async () => {
-    if (!user) {
-      setActivities([]);
-      return;
-    }
     try {
+      const fetchedWorkouts = await getWorkouts();
+      setWorkouts(fetchedWorkouts);
+      
+      if (!user) {
+        setActivities([]);
+        return;
+      }
       const today = new Date().toISOString().split('T')[0];
       const todayLogs = await getActivitiesByDate(user.uid, today);
       setActivities(todayLogs);
     } catch (error) {
-      console.error("Failed to fetch today's activities", error);
+      console.error("Failed to fetch activities/workouts", error);
     }
   };
 
@@ -35,7 +41,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   return (
-    <ActivityContext.Provider value={{ activities, refreshActivities }}>
+    <ActivityContext.Provider value={{ activities, workouts, refreshActivities }}>
       {children}
     </ActivityContext.Provider>
   );

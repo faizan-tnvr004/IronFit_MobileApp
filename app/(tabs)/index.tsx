@@ -7,13 +7,10 @@ import { CircularProgress } from '@/components/CircularProgress';
 import { useAuth } from '@/context/AuthContext';
 import { useActivities } from '@/context/ActivityContext';
 
-const COLORS: Record<string, string> = { Running: '#F97316', Cycling: '#22C55E', Swimming: '#3B82F6', Yoga: '#A855F7', Walking: '#EAB308', Dancing: '#EC4899' };
-const ICONS: Record<string, string> = { Running: 'street-view', Cycling: 'bicycle', Swimming: 'tint', Yoga: 'leaf', Walking: 'male', Dancing: 'music' };
-
 export default function HomeScreen() {
   const router = useRouter();
   const { userProfile } = useAuth();
-  const { activities, refreshActivities } = useActivities();
+  const { activities, workouts, refreshActivities } = useActivities();
 
   const [fontsLoaded] = useFonts({ Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold });
 
@@ -106,25 +103,32 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={s.activityList}>
-            {activities.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={s.activityCard} 
-                onPress={() => router.push(`/${item.type.toLowerCase()}` as any)}
-              >
-                <View style={[s.iconBox, { backgroundColor: COLORS[item.type] + '22' }]}>
-                  <FontAwesome name={ICONS[item.type] as any} size={20} color={COLORS[item.type]} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 16 }}>
-                  <Text style={s.activityName}>{item.type}</Text>
-                  <Text style={s.activityMeta}>{item.durationMin} min • {item.time}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[s.activityValue, { color: COLORS[item.type] }]}>{item.caloriesBurned}</Text>
-                  <Text style={s.activityUnit}>kcal</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {activities.map((item) => {
+              const workout = workouts.find(w => w.name === item.type);
+              const color = workout?.color || '#9999bb';
+              const icon = workout?.icon || 'circle';
+              const route = workout?.id ? `/activity/${workout.id}` : '#';
+              
+              return (
+                <TouchableOpacity 
+                  key={item.id} 
+                  style={s.activityCard} 
+                  onPress={() => router.push(route as any)}
+                >
+                  <View style={[s.iconBox, { backgroundColor: color + '22' }]}>
+                    <FontAwesome name={icon as any} size={20} color={color} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 16 }}>
+                    <Text style={s.activityName}>{item.type}</Text>
+                    <Text style={s.activityMeta}>{item.durationMin} min • {item.time}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[s.activityValue, { color: color }]}>{item.caloriesBurned}</Text>
+                    <Text style={s.activityUnit}>kcal</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 

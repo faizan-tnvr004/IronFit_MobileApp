@@ -4,7 +4,7 @@ import {
   StatusBar, TouchableOpacity, Dimensions, Alert, Modal, TextInput, ActivityIndicator, Platform
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LineChart } from 'react-native-chart-kit';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -17,37 +17,48 @@ import { useActivities } from '@/context/ActivityContext';
 
 const W = Dimensions.get('window').width;
 
-export default function SwimmingScreen() {
+export default function ActivityScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams();
   const { user, userProfile } = useAuth();
-  const { refreshActivities } = useActivities();
+  const { workouts, refreshActivities } = useActivities();
+  
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
+
+  const workout = workouts.find(w => w.id === id);
 
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [showModal, setShowModal] = useState(false);
   const [duration, setDuration] = useState('');
+  const [distance, setDistance] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchData();
-  }, [user]);
+    if (user && workout) {
+      fetchData();
+    } else if (!workout && workouts.length > 0) {
+      // If workout not found after workouts loaded, go back
+      Alert.alert('Error', 'Workout not found');
+      router.back();
+    }
+  }, [user, workout, workouts]);
 
   const fetchData = async () => {
-    if (!user) return;
+    if (!user || !workout) return;
     setIsLoading(true);
     try {
       const today = new Date();
       const weekAgo = new Date();
       weekAgo.setDate(today.getDate() - 6);
       const data = await getActivitiesInRange(user.uid, weekAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]);
-      setLogs(data.filter(a => a.type === 'Swimming'));
+      setLogs(data.filter(a => a.type === workout.name));
     } catch (err) {
       console.error(err);
     } finally {
@@ -56,7 +67,7 @@ export default function SwimmingScreen() {
   };
 
   const handleLogActivity = async () => {
-    if (!duration) {
+    if (!duration || !workout) {
       Alert.alert('Error', 'Please enter duration');
       return;
     }
@@ -65,11 +76,13 @@ export default function SwimmingScreen() {
     setIsSubmitting(true);
     try {
       const durNum = parseInt(duration);
-      const calories = calculateCalories('Swimming', durNum, userProfile.weightKg);
+      const distNum = distance ? parseFloat(distance) : 0;
+      const calories = calculateCalories(workout.metScore, durNum, userProfile.weightKg);
 
       await addActivityLog(user.uid, {
-        type: 'Swimming',
+        type: workout.name,
         durationMin: durNum,
+        distance: distNum > 0 ? distNum : undefined,
         caloriesBurned: calories,
         date: date.toISOString().split('T')[0],
         time: date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
@@ -78,6 +91,7 @@ export default function SwimmingScreen() {
       Alert.alert('Success', 'Activity logged successfully!');
       setShowModal(false);
       setDuration('');
+      setDistance('');
       fetchData();
       refreshActivities();
     } catch (err) {
@@ -107,8 +121,9 @@ export default function SwimmingScreen() {
     }
   };
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded || !workout) return null;
 
+  const totalDistance = logs.reduce((sum, log) => sum + (log.distance || 0), 0);
   const totalTime = logs.reduce((sum, log) => sum + log.durationMin, 0);
   const totalCalories = logs.reduce((sum, log) => sum + log.caloriesBurned, 0);
 
@@ -123,11 +138,15 @@ export default function SwimmingScreen() {
         const diffTime = Math.abs(today.getTime() - logDate.getTime());
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
         if (diffDays >= 0 && diffDays < 7) {
-          chartData[6 - diffDays] += log.durationMin;
+          // If distance exists, plot it, otherwise plot duration
+          chartData[6 - diffDays] += (log.distance || log.durationMin);
         }
       } catch (e) {}
     });
   }
+
+  const hasDistance = logs.some(l => l.distance && l.distance > 0);
+  const chartUnit = hasDistance ? 'km' : 'min';
 
   const weekData = {
     labels,
@@ -139,41 +158,60 @@ export default function SwimmingScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#13131f" />
       <View style={s.container}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}><FontAwesome name="chevron-left" size={16} color="#fff" /></TouchableOpacity>
-        <Text style={s.title}>Swimming</Text>
+        
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
+          <View style={[s.iconBox, { backgroundColor: workout.color + '33' }]}>
+            <FontAwesome name={workout.icon as any} size={28} color={workout.color} />
+          </View>
+          <Text style={s.title}>{workout.name}</Text>
+        </View>
+
         {isLoading ? (
-          <ActivityIndicator size="large" color="#3B82F6" style={{ marginTop: 50 }} />
+          <ActivityIndicator size="large" color={workout.color} style={{ marginTop: 50 }} />
         ) : (
           <>
             <View style={s.statsGrid}>
-              <View style={s.statCard}><Text style={s.statLabel}>Total Time (7d)</Text><Text style={s.statValue}>{totalTime}<Text style={s.statUnit}>min</Text></Text></View>
-              <View style={s.statCard}><Text style={s.statLabel}>Calories Burned</Text><Text style={s.statValue}>{totalCalories}<Text style={s.statUnit}>kcal</Text></Text></View>
+              {[
+                { label: 'Total Logs', value: logs.length.toString(), unit: '' },
+                { label: 'Calories (7d)', value: totalCalories.toString(), unit: 'kcal' },
+                { label: 'Active Time', value: totalTime.toString(), unit: 'min' },
+                ...(hasDistance ? [{ label: 'Distance', value: totalDistance.toFixed(1), unit: 'km' }] : []),
+              ].map((stat) => (
+                <View key={stat.label} style={s.statCard}>
+                  <Text style={s.statLabel}>{stat.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                    <Text style={s.statValue}>{stat.value}</Text>
+                    {stat.unit ? <Text style={s.statUnit}>{stat.unit}</Text> : null}
+                  </View>
+                </View>
+              ))}
             </View>
             <View style={s.chartCard}>
-              <Text style={s.chartTitle}>Weekly Swimming (min)</Text>
+              <Text style={s.chartTitle}>Weekly {hasDistance ? 'Distance' : 'Duration'} ({chartUnit})</Text>
               <LineChart
                 data={weekData} width={W - 64} height={180}
                 chartConfig={{
                   backgroundColor: '#1e1e30', backgroundGradientFrom: '#1e1e30', backgroundGradientTo: '#1e1e30',
-                  decimalPlaces: 0, color: (opacity = 1) => `rgba(59,130,246,${opacity})`,
+                  decimalPlaces: 1, color: (opacity = 1) => workout.color + Math.round(opacity * 255).toString(16).padStart(2, '0'),
                   labelColor: (opacity = 1) => `rgba(153,153,187,${opacity})`,
-                  propsForDots: { r: '4', strokeWidth: '2', stroke: '#3B82F6' },
-                  propsForBackgroundLines: { stroke: '#2e2e44' },
+                  propsForDots: { r: '4', strokeWidth: '2', stroke: workout.color },
+                  propsForBackgroundLines: { stroke: '#2e2e44', strokeDasharray: '4' },
                 }}
-                bezier style={{ borderRadius: 12, marginTop: 8 }}
+                bezier style={{ borderRadius: 12, marginTop: 8 }} withShadow={false}
               />
             </View>
           </>
         )}
       </View>
       <View style={s.footer}>
-        <TouchableOpacity style={[s.startBtn, { backgroundColor: '#3B82F6' }]} onPress={() => { setPickerMode('date'); setShowModal(true); }}>
+        <TouchableOpacity style={[s.startBtn, { backgroundColor: workout.color }]} onPress={() => { setPickerMode('date'); setShowModal(true); }}>
           <FontAwesome name="plus" size={16} color="#fff" style={{ marginRight: 10 }} /><Text style={s.startBtnText}>Log Activity</Text>
         </TouchableOpacity>
       </View>
       <Modal visible={showModal} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Log Swimming Session</Text>
+            <Text style={s.modalTitle}>Log {workout.name} Session</Text>
             <View style={s.inputWrap}>
               <Text style={s.modalLabel}>Activity Date & Time</Text>
               <TouchableOpacity style={s.modalInput} onPress={() => { setPickerMode('date'); setShowDatePicker(true); }}>
@@ -190,9 +228,13 @@ export default function SwimmingScreen() {
               <Text style={s.modalLabel}>Duration (minutes)</Text>
               <TextInput style={s.modalInput} value={duration} onChangeText={setDuration} keyboardType="numeric" placeholderTextColor="#666" />
             </View>
+            <View style={s.inputWrap}>
+              <Text style={s.modalLabel}>Distance (km) (Optional)</Text>
+              <TextInput style={s.modalInput} value={distance} onChangeText={setDistance} keyboardType="numeric" placeholderTextColor="#666" />
+            </View>
             <View style={s.modalActions}>
               <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)} disabled={isSubmitting}><Text style={s.modalCancelText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={[s.modalSave, { backgroundColor: '#3B82F6' }]} onPress={handleLogActivity} disabled={isSubmitting}><Text style={s.modalSaveText}>{isSubmitting ? 'Saving...' : 'Save'}</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.modalSave, { backgroundColor: workout.color }]} onPress={handleLogActivity} disabled={isSubmitting}><Text style={s.modalSaveText}>{isSubmitting ? 'Saving...' : 'Save'}</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -205,7 +247,8 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#13131f' },
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1e1e30', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  title: { fontFamily: 'Nunito_800ExtraBold', fontSize: 36, color: '#fff', marginBottom: 24 },
+  title: { fontFamily: 'Nunito_800ExtraBold', fontSize: 36, color: '#fff', marginLeft: 16 },
+  iconBox: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
   statCard: { width: '47%', backgroundColor: '#1e1e30', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2e2e44' },
   statLabel: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: '#9999bb', marginBottom: 6 },

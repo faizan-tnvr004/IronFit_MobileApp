@@ -63,12 +63,12 @@ function AuthGate() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup';
+    const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup' || segments[0] === 'admin';
     
     if (!user && !inAuthGroup) {
       // Redirect unauthenticated users to login
       router.replace('/login');
-    } else if (user && inAuthGroup) {
+    } else if (user && (segments[0] === 'login' || segments[0] === 'signup')) {
       // Redirect authenticated users away from login/signup
       if (userProfile) {
         router.replace('/(tabs)');
@@ -98,6 +98,7 @@ function AuthGate() {
           <Stack.Screen name="swimming" options={{ headerShown: false }} />
           <Stack.Screen name="dancing" options={{ headerShown: false }} />
       <Stack.Screen name="yoga" options={{ headerShown: false }} />
+      <Stack.Screen name="admin" options={{ headerShown: false }} />
     </Stack>
   );
 }

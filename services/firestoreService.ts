@@ -37,7 +37,7 @@ export interface WeightLog {
 
 export interface ActivityLog {
   id?: string;
-  type: 'Running' | 'Cycling' | 'Swimming' | 'Yoga' | 'Walking' | 'Dancing';
+  type: string; // Dynamic workout type
   durationMin: number;
   caloriesBurned: number;
   distance?: number;
@@ -47,19 +47,22 @@ export interface ActivityLog {
   createdAt?: Timestamp;
 }
 
-// MET Values for calorie calculation
-const MET_VALUES: Record<ActivityLog['type'], number> = {
-  Walking: 3.5,
-  Dancing: 5.5,
-  Running: 9.8,
-  Cycling: 7.5,
-  Swimming: 8.0,
-  Yoga: 3.0,
-};
+export interface Workout {
+  id?: string;
+  name: string;
+  desc: string;
+  kcal: string; // display string like '~150 kcal/hour'
+  icon: string;
+  color: string;
+  metScore: number;
+  defaultDuration: string; // '30 min'
+  defaultCalories: string; // '150 kcal'
+  createdAt?: Timestamp;
+}
 
 // --- Helper: Calorie Calculation ---
-export const calculateCalories = (type: ActivityLog['type'], durationMin: number, weightKg: number): number => {
-  const met = MET_VALUES[type] || 5.0; // Fallback to moderate MET if missing
+export const calculateCalories = (metScore: number, durationMin: number, weightKg: number): number => {
+  const met = metScore || 5.0; // Fallback to moderate MET if missing
   const durationHours = durationMin / 60;
   // Formula: Calories = MET x weight(kg) x duration(hours)
   return Math.round(met * weightKg * durationHours);
@@ -227,6 +230,64 @@ export const getWeightLogs = async (uid: string): Promise<WeightLog[]> => {
     })) as WeightLog[];
   } catch (error) {
     console.error("Error fetching weight logs:", error);
+    throw error;
+  }
+};
+
+// --- Workout (Admin) Functions ---
+
+export const getWorkouts = async (): Promise<Workout[]> => {
+  try {
+    const workoutsRef = collection(db, 'workouts');
+    const q = query(workoutsRef, orderBy('createdAt', 'asc'));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Workout[];
+  } catch (error) {
+    console.error("Error fetching workouts:", error);
+    throw error;
+  }
+};
+
+export const addWorkout = async (workoutData: Omit<Workout, 'id' | 'createdAt'>) => {
+  try {
+    const workoutsRef = collection(db, 'workouts');
+    const docRef = await addDoc(workoutsRef, {
+      ...workoutData,
+      createdAt: Timestamp.now(),
+    });
+    return { success: true, id: docRef.id };
+  } catch (error) {
+    console.error("Error adding workout:", error);
+    throw error;
+  }
+};
+
+export const updateWorkout = async (workoutId: string, updates: Partial<Workout>) => {
+  try {
+    const workoutRef = doc(db, 'workouts', workoutId);
+    await updateDoc(workoutRef, updates);
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating workout:", error);
+    throw error;
+  }
+};
+
+export const deleteWorkout = async (workoutId: string) => {
+  try {
+    const workoutRef = doc(db, 'workouts', workoutId);
+    // Use deleteDoc from firestore, need to import it
+    // Wait, let's use the updateDoc pattern or just import deleteDoc at top.
+    // Instead of importing, we'll just require it.
+    const { deleteDoc } = require('firebase/firestore');
+    await deleteDoc(workoutRef);
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting workout:", error);
     throw error;
   }
 };
