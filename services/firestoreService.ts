@@ -237,19 +237,29 @@ export const getWeightLogs = async (uid: string): Promise<WeightLog[]> => {
 
 // --- Workout (Admin) Functions ---
 
+const CORE_WORKOUTS: Workout[] = [
+  { id: 'def-walking', name: 'Walking', desc: 'Moderate pace walking', kcal: '~280 kcal/hour', icon: 'street-view', color: '#22C55E', metScore: 4.0, defaultDuration: '30 min', defaultCalories: '140 kcal' },
+  { id: 'def-running', name: 'Running', desc: 'Continuous running', kcal: '~680 kcal/hour', icon: 'male', color: '#EF4444', metScore: 9.8, defaultDuration: '30 min', defaultCalories: '340 kcal' },
+  { id: 'def-skipping', name: 'Skipping Rope', desc: 'High intensity cardio', kcal: '~860 kcal/hour', icon: 'heart', color: '#F97316', metScore: 12.3, defaultDuration: '15 min', defaultCalories: '215 kcal' },
+  { id: 'def-jumping', name: 'Jumping Jacks', desc: 'Full body cardio', kcal: '~560 kcal/hour', icon: 'futbol-o', color: '#A855F7', metScore: 8.0, defaultDuration: '15 min', defaultCalories: '140 kcal' },
+  { id: 'def-strength', name: 'Strength Workout', desc: 'Weight lifting/Bodyweight', kcal: '~420 kcal/hour', icon: 'bolt', color: '#3B82F6', metScore: 6.0, defaultDuration: '45 min', defaultCalories: '315 kcal' },
+];
+
 export const getWorkouts = async (): Promise<Workout[]> => {
   try {
     const workoutsRef = collection(db, 'workouts');
     const q = query(workoutsRef, orderBy('createdAt', 'asc'));
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => ({
+    const dbWorkouts = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     })) as Workout[];
+
+    return [...CORE_WORKOUTS, ...dbWorkouts];
   } catch (error) {
     console.error("Error fetching workouts:", error);
-    throw error;
+    return CORE_WORKOUTS; // Fallback to core if DB fails
   }
 };
 
