@@ -11,7 +11,7 @@ const TODAY = new Date().toISOString().split('T')[0];
 
 export default function HistoryScreen() {
   const { user } = useAuth();
-  const { workouts } = useActivities();
+  const { workouts, refreshTrigger } = useActivities();
   const [sel, setSel] = useState(TODAY);
   const [allActivities, setAllActivities] = useState<ActivityLog[]>([]);
   const [dayActivities, setDayActivities] = useState<ActivityLog[]>([]);
@@ -25,7 +25,7 @@ export default function HistoryScreen() {
       fetchAllActivities();
       fetchDayActivities(sel);
     }
-  }, [user]);
+  }, [user, refreshTrigger]);
 
   const fetchAllActivities = async () => {
     if (!user) return;

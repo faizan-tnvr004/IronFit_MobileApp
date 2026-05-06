@@ -4,6 +4,7 @@ import { useFonts, Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { LineChart } from 'react-native-chart-kit';
 import { useAuth } from '@/context/AuthContext';
+import { useActivities } from '@/context/ActivityContext';
 import { getActivitiesInRange, ActivityLog, getWeightLogs, addWeightLog, WeightLog } from '@/services/firestoreService';
 
 const TIME_RANGES = ['1 Week', '2 Week', '3 Week', '1 Month'] as const;
@@ -12,6 +13,7 @@ const W = Dimensions.get('window').width;
 
 export default function ProgressScreen() {
   const { user, userProfile, refreshProfile } = useAuth();
+  const { refreshTrigger } = useActivities();
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1 Week');
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [prevLogs, setPrevLogs] = useState<ActivityLog[]>([]);
@@ -30,7 +32,7 @@ export default function ProgressScreen() {
     if (user) {
       fetchProgressData();
     }
-  }, [user, userProfile?.weightKg, selectedRange]);
+  }, [user, userProfile?.weightKg, selectedRange, refreshTrigger]);
 
   const fetchProgressData = async () => {
     if (!user) return;

@@ -223,7 +223,7 @@ export const addWeightLog = async (uid: string, weightData: Omit<WeightLog, 'cre
 export const getWeightLogs = async (uid: string): Promise<WeightLog[]> => {
   try {
     const weightRef = collection(db, 'users', uid, 'weightLogs');
-    const q = query(weightRef, orderBy('date', 'asc'));
+    const q = query(weightRef, orderBy('date', 'asc'), orderBy('createdAt', 'asc'));
     const querySnapshot = await getDocs(q);
 
     return querySnapshot.docs.map(doc => ({
