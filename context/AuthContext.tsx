@@ -82,6 +82,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(true);
     try {
       await firebaseSignOut(auth);
+      setUser(null);
+      setUserProfile(null);
+      console.log('Successfully signed out from Firebase');
+    } catch (error) {
+      console.error('Error during sign out:', error);
     } finally {
       setIsLoading(false);
     }

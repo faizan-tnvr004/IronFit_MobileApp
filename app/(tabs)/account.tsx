@@ -10,7 +10,8 @@ import {
   TextInput,
   Modal,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import {
   useFonts,
@@ -52,11 +53,20 @@ export default function AccountScreen() {
   if (!fontsLoaded || !userProfile) return <View style={s.screen}><ActivityIndicator size="large" color="#F97316" style={{marginTop: 100}} /></View>;
 
   const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) {
+        signOut().catch(console.error);
+      }
+      return;
+    }
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Logout', style: 'destructive', onPress: async () => {
-        await signOut();
-        // AuthGate handles redirection
+        try {
+          await signOut();
+        } catch (error) {
+          console.error("Logout failed:", error);
+        }
       }},
     ]);
   };
@@ -81,6 +91,14 @@ export default function AccountScreen() {
       let val: any = editValue.trim();
       if (['age', 'heightCm', 'weightKg', 'dailyStepGoal'].includes(editingField)) {
         val = parseFloat(val);
+      }
+      
+      if (editingField === 'weightKg') {
+        if (isNaN(val) || val < 40 || val > 400) {
+          Alert.alert('Invalid Weight', 'Please enter a valid weight between 40 and 400 kg.');
+          setIsUpdating(false);
+          return;
+        }
       }
       
       await updateUserProfile(user.uid, { [editingField]: val });
@@ -151,37 +169,12 @@ export default function AccountScreen() {
           ))}
         </View>
 
-        {/* Settings Section */}
-        <View style={s.settingsCard}>
-          <Text style={s.infoTitle}>Settings</Text>
-
-          {[
-            { icon: 'bell' as const, label: 'Notifications', value: 'On' },
-            { icon: 'moon-o' as const, label: 'Dark Mode', value: 'On' },
-            { icon: 'language' as const, label: 'Language', value: 'English' },
-            { icon: 'lock' as const, label: 'Privacy', value: '' },
-          ].map((item, i) => (
-            <View key={item.label}>
-              {i > 0 && <View style={s.divider} />}
-              <TouchableOpacity style={s.settingRow} activeOpacity={0.6}>
-                <View style={s.settingIconWrap}>
-                  <FontAwesome name={item.icon} size={16} color="#F97316" />
-                </View>
-                <Text style={s.settingLabel}>{item.label}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {item.value ? (
-                    <Text style={s.settingValue}>{item.value}</Text>
-                  ) : null}
-                  <FontAwesome
-                    name="chevron-right"
-                    size={12}
-                    color="#9999bb"
-                    style={{ marginLeft: 8 }}
-                  />
-                </View>
-              </TouchableOpacity>
-            </View>
-          ))}
+        {/* About Us Section */}
+        <View style={s.aboutCard}>
+          <Text style={s.infoTitle}>About Us</Text>
+          <Text style={s.aboutText}>
+            Hi. welcome to our SMD project. This took a lot of time to make, so we hope you enjoy it!
+          </Text>
         </View>
 
         {/* Log Out Button */}
@@ -255,11 +248,8 @@ const s = StyleSheet.create({
   fieldLabel: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: '#9999bb', marginBottom: 4 },
   fieldValue: { fontFamily: 'Nunito_600SemiBold', fontSize: 16, color: '#e0e0ff' },
   editBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  settingsCard: { marginHorizontal: 16, marginTop: 16, backgroundColor: '#1e1e30', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#2e2e44' },
-  settingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
-  settingIconWrap: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#F9731618', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  settingLabel: { fontFamily: 'Nunito_600SemiBold', fontSize: 15, color: '#e0e0ff', flex: 1 },
-  settingValue: { fontFamily: 'Nunito_400Regular', fontSize: 13, color: '#9999bb' },
+  aboutCard: { marginHorizontal: 16, marginTop: 16, backgroundColor: '#1e1e30', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#2e2e44' },
+  aboutText: { fontFamily: 'Nunito_400Regular', fontSize: 14, color: '#9999bb', lineHeight: 22 },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginHorizontal: 16, marginTop: 24, paddingVertical: 16, backgroundColor: '#1e1e30', borderRadius: 16, borderWidth: 1, borderColor: '#ff4d4d33' },
   logoutText: { fontFamily: 'Nunito_700Bold', fontSize: 16, color: '#ff4d4d' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },

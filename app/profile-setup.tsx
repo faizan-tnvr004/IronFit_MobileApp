@@ -49,6 +49,12 @@ export default function ProfileSetupScreen() {
 
     try {
       const weightVal = parseFloat(weight);
+      if (isNaN(weightVal) || weightVal < 40 || weightVal > 400) {
+        setErrorMsg('Please enter a valid weight between 40 and 400 kg.');
+        setIsSubmitting(false);
+        return;
+      }
+      
       await createUserProfile(user.uid, {
         name,
         email: user.email || '',

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, Modal, TextInput, Alert
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, Modal, TextInput, Alert, Platform
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
@@ -29,7 +29,8 @@ export default function AddActivityScreen() {
   
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
-  const [formMet, setFormMet] = useState('');
+  const [formMet, setFormMet] = useState('5.0');
+  const [formDur, setFormDur] = useState('30');
   const [formIcon, setFormIcon] = useState(ICONS[0]);
   const [formColor, setFormColor] = useState(COLORS[0]);
 
@@ -44,7 +45,8 @@ export default function AddActivityScreen() {
   const handleOpenModal = () => {
     setFormName('');
     setFormDesc('');
-    setFormMet('');
+    setFormMet('5.0');
+    setFormDur('30');
     setFormIcon(ICONS[0]);
     setFormColor(COLORS[0]);
     setShowModal(true);
@@ -71,8 +73,8 @@ export default function AddActivityScreen() {
         icon: formIcon,
         color: formColor,
         metScore,
-        defaultDuration: '30 min',
-        defaultCalories: `${Math.round(metScore * 70 * 0.5)} kcal`,
+        defaultDuration: `${formDur} min`,
+        defaultCalories: `${Math.round(metScore * 70 * (parseInt(formDur) / 60))} kcal`,
       };
 
       await addCustomWorkout(user.uid, workoutData);
@@ -88,6 +90,16 @@ export default function AddActivityScreen() {
 
   const handleDelete = (id: string) => {
     if (!user) return;
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete this custom workout?')) {
+        deleteCustomWorkout(user.uid, id)
+          .then(() => refreshActivities())
+          .catch(() => Alert.alert('Error', 'Failed to delete custom workout'));
+      }
+      return;
+    }
+
     Alert.alert('Confirm', 'Delete this custom workout?', [
       { text: 'Cancel', style: 'cancel' },
       { 
@@ -122,26 +134,27 @@ export default function AddActivityScreen() {
           ) : (
             <View style={s.grid}>
               {workouts.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={s.card}
-                  onPress={() => handleSelect(item)}
-                  activeOpacity={0.75}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={[s.iconWrap, { backgroundColor: item.color + '22' }]}>
-                      <FontAwesome name={item.icon as any} size={22} color={item.color} />
-                    </View>
-                    {item.isCustom && item.id && (
-                      <TouchableOpacity onPress={() => handleDelete(item.id!)} style={s.delBtn}>
-                        <FontAwesome name="trash" size={16} color="#ef4444" />
+                <View key={item.id} style={s.cardContainer}>
+                  <View style={s.card}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <TouchableOpacity onPress={() => handleSelect(item)} activeOpacity={0.75}>
+                        <View style={[s.iconWrap, { backgroundColor: item.color + '22' }]}>
+                          <FontAwesome name={item.icon as any} size={22} color={item.color} />
+                        </View>
                       </TouchableOpacity>
-                    )}
+                      {item.isCustom && item.id && (
+                        <TouchableOpacity onPress={() => handleDelete(item.id!)} style={s.delBtn}>
+                          <FontAwesome name="trash" size={16} color="#ef4444" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    <TouchableOpacity onPress={() => handleSelect(item)} activeOpacity={0.75} style={{ flex: 1 }}>
+                      <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.cardDesc} numberOfLines={1}>{item.desc}</Text>
+                      <Text style={[s.cardKcal, { color: item.color }]}>{item.kcal}</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={s.cardDesc} numberOfLines={1}>{item.desc}</Text>
-                  <Text style={[s.cardKcal, { color: item.color }]}>{item.kcal}</Text>
-                </TouchableOpacity>
+                </View>
               ))}
             </View>
           )}
@@ -169,6 +182,23 @@ export default function AddActivityScreen() {
               
               <Text style={s.label}>MET Score (Multiplier for calories)</Text>
               <TextInput style={s.input} value={formMet} onChangeText={setFormMet} keyboardType="numeric" placeholder="e.g. 7.5" placeholderTextColor="#666" />
+
+              <Text style={s.label}>Default Duration (minutes)</Text>
+              <View style={s.selRow}>
+                {['15', '30', '45', '60', '90'].map(d => (
+                  <TouchableOpacity key={d} onPress={() => setFormDur(d)} style={[s.pillBtn, formDur === d && s.pillBtnActive]}>
+                    <Text style={[s.pillText, formDur === d && s.pillTextActive]}>{d}m</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput 
+                style={[s.input, { marginTop: 10 }]} 
+                value={formDur} 
+                onChangeText={setFormDur} 
+                keyboardType="numeric" 
+                placeholder="Custom minutes (e.g. 20)" 
+                placeholderTextColor="#666" 
+              />
 
               <Text style={s.label}>Icon</Text>
               <View style={s.selRow}>
@@ -210,9 +240,10 @@ const s = StyleSheet.create({
   sheetTitle: { fontFamily: 'Nunito_800ExtraBold', fontSize: 24, color: '#fff' },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#2e2e44', alignItems: 'center', justifyContent: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  card: { width: '47%', backgroundColor: '#13131f', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2e2e44' },
+  cardContainer: { width: '47%' },
+  card: { width: '100%', backgroundColor: '#13131f', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2e2e44' },
   iconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  delBtn: { padding: 4, borderRadius: 12, backgroundColor: '#2e2e44' },
+  delBtn: { padding: 8, borderRadius: 12, backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#ff4d4d33' },
   cardName: { fontFamily: 'Nunito_700Bold', fontSize: 16, color: '#fff', marginBottom: 4 },
   cardDesc: { fontFamily: 'Nunito_400Regular', fontSize: 12, color: '#9999bb', marginBottom: 6 },
   cardKcal: { fontFamily: 'Nunito_600SemiBold', fontSize: 12 },
@@ -234,4 +265,8 @@ const s = StyleSheet.create({
   modalCancelText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#9999bb' },
   modalSave: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#F97316' },
   modalSaveText: { fontFamily: 'Nunito_700Bold', fontSize: 14, color: '#fff' },
+  pillBtn: { backgroundColor: '#13131f', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#2e2e44' },
+  pillBtnActive: { backgroundColor: '#F97316', borderColor: '#F97316' },
+  pillText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#9999bb' },
+  pillTextActive: { color: '#fff', fontFamily: 'Nunito_700Bold' },
 });

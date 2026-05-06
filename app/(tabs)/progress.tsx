@@ -11,7 +11,7 @@ type TimeRange = (typeof TIME_RANGES)[number];
 const W = Dimensions.get('window').width;
 
 export default function ProgressScreen() {
-  const { user, refreshProfile } = useAuth();
+  const { user, userProfile, refreshProfile } = useAuth();
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1 Week');
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [prevLogs, setPrevLogs] = useState<ActivityLog[]>([]);
@@ -22,6 +22,7 @@ export default function ProgressScreen() {
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [newWeight, setNewWeight] = useState('');
   const [isSubmittingWeight, setIsSubmittingWeight] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0, value: 0, visible: false });
 
   const [fontsLoaded] = useFonts({ Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold });
 
@@ -29,7 +30,7 @@ export default function ProgressScreen() {
     if (user) {
       fetchProgressData();
     }
-  }, [user, selectedRange]);
+  }, [user, userProfile?.weightKg, selectedRange]);
 
   const fetchProgressData = async () => {
     if (!user) return;
@@ -64,10 +65,17 @@ export default function ProgressScreen() {
 
   const handleLogWeight = async () => {
     if (!newWeight || !user) return;
+    
+    const weightVal = parseFloat(newWeight);
+    if (isNaN(weightVal) || weightVal < 40 || weightVal > 400) {
+      Alert.alert('Invalid Weight', 'Please enter a valid weight between 40 and 400 kg.');
+      return;
+    }
+
     setIsSubmittingWeight(true);
     try {
       await addWeightLog(user.uid, {
-        weight: parseFloat(newWeight),
+        weight: weightVal,
         date: new Date().toISOString().split('T')[0]
       });
       await refreshProfile();
@@ -176,23 +184,34 @@ export default function ProgressScreen() {
             </TouchableOpacity>
           </View>
           {weightLogs.length > 0 ? (
-            <LineChart
-              data={weightChartData}
-              width={W - 64}
-              height={180}
-              chartConfig={{
-                backgroundColor: '#1e1e30',
-                backgroundGradientFrom: '#1e1e30',
-                backgroundGradientTo: '#1e1e30',
-                decimalPlaces: 1,
-                color: (opacity = 1) => `rgba(249, 115, 22, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(153, 153, 187, ${opacity})`,
-                propsForDots: { r: '4', strokeWidth: '2', stroke: '#F97316' },
-                propsForBackgroundLines: { stroke: '#2e2e44' },
-              }}
-              bezier
-              style={{ borderRadius: 16 }}
-            />
+            <View style={{ position: 'relative' }}>
+              <LineChart
+                data={weightChartData}
+                width={W - 64}
+                height={180}
+                chartConfig={{
+                  backgroundColor: '#1e1e30',
+                  backgroundGradientFrom: '#1e1e30',
+                  backgroundGradientTo: '#1e1e30',
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(249, 115, 22, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(153, 153, 187, ${opacity})`,
+                  propsForDots: { r: '4', strokeWidth: '2', stroke: '#F97316' },
+                  propsForBackgroundLines: { stroke: '#2e2e44' },
+                }}
+                bezier
+                style={{ borderRadius: 16 }}
+                onDataPointClick={(data) => {
+                  setTooltipPos({ x: data.x, y: data.y, value: data.value, visible: true });
+                  setTimeout(() => setTooltipPos(prev => ({ ...prev, visible: false })), 3000);
+                }}
+              />
+              {tooltipPos.visible && (
+                <View style={[s.tooltip, { left: tooltipPos.x - 20, top: tooltipPos.y - 35 }]}>
+                  <Text style={s.tooltipText}>{tooltipPos.value} kg</Text>
+                </View>
+              )}
+            </View>
           ) : (
             <View style={s.emptyWeight}>
               <Text style={s.emptyWeightText}>No weight logs yet. Start tracking to see progress!</Text>
@@ -328,4 +347,6 @@ const s = StyleSheet.create({
   modalCancelText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#9999bb' },
   modalSave: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#F97316' },
   modalSaveText: { fontFamily: 'Nunito_700Bold', fontSize: 14, color: '#fff' },
+  tooltip: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.85)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, zIndex: 10 },
+  tooltipText: { fontFamily: 'Nunito_700Bold', fontSize: 12, color: '#fff' },
 });
