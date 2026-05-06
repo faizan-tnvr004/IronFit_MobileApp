@@ -11,7 +11,8 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import {
   useFonts,
@@ -135,9 +136,13 @@ export default function AccountScreen() {
         <View style={s.avatarSection}>
           <View style={s.avatarContainer}>
             <View style={s.avatar}>
-              <Text style={s.avatarText}>{initials}</Text>
+              {userProfile.photoURL ? (
+                <Image source={{ uri: userProfile.photoURL }} style={s.avatarImage} />
+              ) : (
+                <Text style={s.avatarText}>{initials}</Text>
+              )}
             </View>
-            <TouchableOpacity style={s.cameraBtn} activeOpacity={0.7}>
+            <TouchableOpacity style={s.cameraBtn} activeOpacity={0.7} onPress={() => router.push('/profile-setup')}>
               <FontAwesome name="camera" size={12} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -236,7 +241,8 @@ const s = StyleSheet.create({
   title: { fontFamily: 'Nunito_800ExtraBold', fontSize: 32, color: '#fff' },
   avatarSection: { alignItems: 'center', paddingVertical: 24 },
   avatarContainer: { position: 'relative', marginBottom: 16 },
-  avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: 100, height: 100, borderRadius: 50 },
   avatarText: { fontFamily: 'Nunito_800ExtraBold', fontSize: 40, color: '#fff' },
   cameraBtn: { position: 'absolute', bottom: 2, right: 2, width: 30, height: 30, borderRadius: 15, backgroundColor: '#2d2b55', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#13131f' },
   userName: { fontFamily: 'Nunito_700Bold', fontSize: 22, color: '#fff' },

@@ -1,13 +1,13 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  addDoc, 
-  query, 
-  where, 
-  getDocs, 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  addDoc,
+  query,
+  where,
+  getDocs,
   Timestamp,
   orderBy
 } from 'firebase/firestore';
@@ -24,6 +24,7 @@ export interface UserProfile {
   gender: 'male' | 'female';
   fitnessGoal: string;
   dailyStepGoal: number;
+  photoURL?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -134,11 +135,11 @@ export const getActivitiesByDate = async (uid: string, date: string): Promise<Ac
   try {
     const activitiesRef = collection(db, 'users', uid, 'activities');
     const q = query(
-      activitiesRef, 
+      activitiesRef,
       where('date', '==', date)
     );
     const querySnapshot = await getDocs(q);
-    
+
     const logs = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -161,7 +162,7 @@ export const getAllActivities = async (uid: string): Promise<ActivityLog[]> => {
     const activitiesRef = collection(db, 'users', uid, 'activities');
     const q = query(activitiesRef, orderBy('createdAt', 'desc'));
     const querySnapshot = await getDocs(q);
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -178,13 +179,13 @@ export const getActivitiesInRange = async (uid: string, startDate: string, endDa
     // Note: Firestore requires a composite index if you order by something other than the where clause field.
     // For simplicity, we just filter by date string (which naturally sorts)
     const q = query(
-      activitiesRef, 
+      activitiesRef,
       where('date', '>=', startDate),
       where('date', '<=', endDate),
       orderBy('date', 'desc')
     );
     const querySnapshot = await getDocs(q);
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -204,7 +205,7 @@ export const addWeightLog = async (uid: string, weightData: Omit<WeightLog, 'cre
       ...weightData,
       createdAt: Timestamp.now(),
     });
-    
+
     // Also update the current weight in the profile
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
@@ -224,7 +225,7 @@ export const getWeightLogs = async (uid: string): Promise<WeightLog[]> => {
     const weightRef = collection(db, 'users', uid, 'weightLogs');
     const q = query(weightRef, orderBy('date', 'asc'));
     const querySnapshot = await getDocs(q);
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -250,7 +251,7 @@ export const getWorkouts = async (): Promise<Workout[]> => {
     const workoutsRef = collection(db, 'workouts');
     const q = query(workoutsRef, orderBy('createdAt', 'asc'));
     const querySnapshot = await getDocs(q);
-    
+
     const dbWorkouts = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -310,7 +311,7 @@ export const getCustomWorkouts = async (uid: string): Promise<Workout[]> => {
     const workoutsRef = collection(db, 'users', uid, 'customWorkouts');
     const q = query(workoutsRef, orderBy('createdAt', 'asc'));
     const querySnapshot = await getDocs(q);
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -347,4 +348,3 @@ export const deleteCustomWorkout = async (uid: string, workoutId: string) => {
     throw error;
   }
 };
-

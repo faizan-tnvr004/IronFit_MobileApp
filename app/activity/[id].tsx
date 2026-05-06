@@ -76,17 +76,22 @@ export default function ActivityScreen() {
     setIsSubmitting(true);
     try {
       const durNum = parseInt(duration);
-      const distNum = distance ? parseFloat(distance) : 0;
+      const distNum = distance.trim() ? parseFloat(distance.replace(',', '.')) : 0;
       const calories = calculateCalories(workout.metScore, durNum, userProfile.weightKg);
 
-      await addActivityLog(user.uid, {
+      const logData: any = {
         type: workout.name,
         durationMin: durNum,
-        distance: distNum > 0 ? distNum : undefined,
         caloriesBurned: calories,
         date: date.toISOString().split('T')[0],
         time: date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-      });
+      };
+
+      if (!isNaN(distNum) && distNum > 0) {
+        logData.distance = distNum;
+      }
+
+      await addActivityLog(user.uid, logData);
 
       Alert.alert('Success', 'Activity logged successfully!');
       setShowModal(false);

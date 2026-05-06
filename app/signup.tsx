@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, StatusBar,
   TextInput, TouchableOpacity, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Platform, ScrollView, Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import {
@@ -21,12 +22,26 @@ export default function SignupScreen() {
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [image, setImage] = useState<string | null>(null);
   const { signUp, isLoading } = useAuth();
 
   const [fontsLoaded] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
   if (!fontsLoaded) return null;
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
 
   const handleSignup = async () => {
     if (!name || !email || !password || !confirm) {
@@ -45,6 +60,16 @@ export default function SignupScreen() {
     try {
       await signUp(email, password);
       // Navigation is handled automatically by the AuthGate in _layout.tsx
+      // But we can also manually navigate with the image if needed, though AuthGate will trigger first.
+      // Actually, since AuthGate will trigger immediately, we might need to store the image in a more persistent way
+      // or just let profile-setup handle it.
+      if (image) {
+        // If image was picked, we'll try to pass it to profile-setup
+        router.push({
+          pathname: '/profile-setup',
+          params: { initialImage: image }
+        });
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to sign up');
     }
@@ -68,14 +93,18 @@ export default function SignupScreen() {
           {errorMsg ? <Text style={s.errorText}>{errorMsg}</Text> : null}
 
           {/* Avatar Picker */}
-          <View style={s.avatarWrap}>
+          <TouchableOpacity style={s.avatarWrap} onPress={pickImage}>
             <View style={s.avatar}>
-              <FontAwesome name="camera" size={28} color="#9999bb" />
+              {image ? (
+                <Image source={{ uri: image }} style={s.avatarImg} />
+              ) : (
+                <FontAwesome name="camera" size={28} color="#9999bb" />
+              )}
             </View>
             <View style={s.avatarPlus}>
               <FontAwesome name="plus" size={12} color="#fff" />
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Fields */}
           <View style={s.inputWrap}>
@@ -131,7 +160,8 @@ const s = StyleSheet.create({
   heading: { fontFamily: 'Nunito_800ExtraBold', fontSize: 28, color: '#fff', textAlign: 'center', marginBottom: 28 },
   errorText: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#ff4d4d', marginBottom: 16, textAlign: 'center' },
   avatarWrap: { alignSelf: 'center', marginBottom: 28, position: 'relative' },
-  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#1e1e30', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2e2e44' },
+  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#1e1e30', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2e2e44', overflow: 'hidden' },
+  avatarImg: { width: 90, height: 90, borderRadius: 45 },
   avatarPlus: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center' },
   inputWrap: { position: 'relative', marginBottom: 16 },
   input: { backgroundColor: '#1e1e30', borderRadius: 14, height: 54, paddingHorizontal: 18, fontFamily: 'Nunito_400Regular', fontSize: 15, color: '#e0e0ff', borderWidth: 1, borderColor: '#2e2e44' },

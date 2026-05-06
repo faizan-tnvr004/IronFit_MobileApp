@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, StatusBar,
   TextInput, TouchableOpacity, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Platform, ScrollView, Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   useFonts, Nunito_400Regular, Nunito_600SemiBold,
   Nunito_700Bold, Nunito_800ExtraBold,
@@ -15,8 +16,9 @@ import { createUserProfile, addWeightLog } from '@/services/firestoreService';
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
+  const { initialImage } = useLocalSearchParams<{ initialImage?: string }>();
   const { user, refreshProfile } = useAuth();
-  
+
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
@@ -24,7 +26,8 @@ export default function ProfileSetupScreen() {
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [goal, setGoal] = useState('Weight Loss');
   const [stepGoal, setStepGoal] = useState<number>(10000);
-  
+  const [image, setImage] = useState<string | null>(initialImage || null);
+
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -32,13 +35,26 @@ export default function ProfileSetupScreen() {
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
   if (!fontsLoaded) return null;
+  
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
 
   const handleSave = async () => {
     if (!name || !age || !height || !weight) {
       setErrorMsg('Please fill in all fields');
       return;
     }
-    
+
     if (!user) {
       setErrorMsg('User not authenticated');
       return;
@@ -54,7 +70,7 @@ export default function ProfileSetupScreen() {
         setIsSubmitting(false);
         return;
       }
-      
+
       await createUserProfile(user.uid, {
         name,
         email: user.email || '',
@@ -64,6 +80,7 @@ export default function ProfileSetupScreen() {
         gender,
         fitnessGoal: goal,
         dailyStepGoal: stepGoal,
+        photoURL: image || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Default avatar logo
       });
 
       // Log the initial weight to the trend graph
@@ -71,7 +88,7 @@ export default function ProfileSetupScreen() {
         weight: weightVal,
         date: new Date().toISOString().split('T')[0]
       });
-      
+
       await refreshProfile();
       // Navigation to (tabs) handled automatically by AuthGate
     } catch (err: any) {
@@ -91,17 +108,32 @@ export default function ProfileSetupScreen() {
             <Text style={s.sub}>Let us know more about you to personalize your experience and calculate accurate calories.</Text>
           </View>
 
+          {/* Profile Photo Picker */}
+          <TouchableOpacity style={s.avatarContainer} onPress={pickImage}>
+            {image ? (
+              <Image source={{ uri: image }} style={s.avatar} />
+            ) : (
+              <View style={s.avatarPlaceholder}>
+                <FontAwesome name="camera" size={24} color="#9999bb" />
+              </View>
+            )}
+            <View style={s.avatarPlus}>
+              <FontAwesome name="plus" size={10} color="#fff" />
+            </View>
+            <Text style={s.avatarLabel}>{image ? 'Change Photo' : 'Add Photo'}</Text>
+          </TouchableOpacity>
+
           {errorMsg ? <Text style={s.errorText}>{errorMsg}</Text> : null}
 
           {/* Name */}
           <View style={s.inputGroup}>
             <Text style={s.label}>Full Name</Text>
-            <TextInput 
-              style={s.input} 
-              placeholder="e.g. Alex Johnson" 
+            <TextInput
+              style={s.input}
+              placeholder="e.g. Alex Johnson"
               placeholderTextColor="#666"
-              value={name} 
-              onChangeText={setName} 
+              value={name}
+              onChangeText={setName}
             />
           </View>
 
@@ -109,26 +141,26 @@ export default function ProfileSetupScreen() {
           <View style={s.row}>
             <View style={[s.inputGroup, { flex: 1, marginRight: 8 }]}>
               <Text style={s.label}>Age</Text>
-              <TextInput 
-                style={s.input} 
-                placeholder="25" 
+              <TextInput
+                style={s.input}
+                placeholder="25"
                 placeholderTextColor="#666"
                 keyboardType="numeric"
-                value={age} 
-                onChangeText={setAge} 
+                value={age}
+                onChangeText={setAge}
               />
             </View>
             <View style={[s.inputGroup, { flex: 1, marginLeft: 8 }]}>
               <Text style={s.label}>Gender</Text>
               <View style={s.toggleRow}>
-                <TouchableOpacity 
-                  style={[s.toggleBtn, gender === 'male' && s.toggleActive]} 
+                <TouchableOpacity
+                  style={[s.toggleBtn, gender === 'male' && s.toggleActive]}
                   onPress={() => setGender('male')}
                 >
                   <Text style={[s.toggleText, gender === 'male' && s.toggleTextActive]}>M</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[s.toggleBtn, gender === 'female' && s.toggleActive]} 
+                <TouchableOpacity
+                  style={[s.toggleBtn, gender === 'female' && s.toggleActive]}
                   onPress={() => setGender('female')}
                 >
                   <Text style={[s.toggleText, gender === 'female' && s.toggleTextActive]}>F</Text>
@@ -141,24 +173,24 @@ export default function ProfileSetupScreen() {
           <View style={s.row}>
             <View style={[s.inputGroup, { flex: 1, marginRight: 8 }]}>
               <Text style={s.label}>Height (cm)</Text>
-              <TextInput 
-                style={s.input} 
-                placeholder="175" 
+              <TextInput
+                style={s.input}
+                placeholder="175"
                 placeholderTextColor="#666"
                 keyboardType="numeric"
-                value={height} 
-                onChangeText={setHeight} 
+                value={height}
+                onChangeText={setHeight}
               />
             </View>
             <View style={[s.inputGroup, { flex: 1, marginLeft: 8 }]}>
               <Text style={s.label}>Weight (kg)</Text>
-              <TextInput 
-                style={s.input} 
-                placeholder="70" 
+              <TextInput
+                style={s.input}
+                placeholder="70"
                 placeholderTextColor="#666"
                 keyboardType="numeric"
-                value={weight} 
-                onChangeText={setWeight} 
+                value={weight}
+                onChangeText={setWeight}
               />
             </View>
           </View>
@@ -168,8 +200,8 @@ export default function ProfileSetupScreen() {
             <Text style={s.label}>Fitness Goal</Text>
             <View style={s.pillsContainer}>
               {['Weight Loss', 'Muscle Gain', 'Stay Fit', 'Endurance'].map(g => (
-                <TouchableOpacity 
-                  key={g} 
+                <TouchableOpacity
+                  key={g}
                   style={[s.pill, goal === g && s.pillActive]}
                   onPress={() => setGoal(g)}
                 >
@@ -184,13 +216,13 @@ export default function ProfileSetupScreen() {
             <Text style={s.label}>Daily Step Goal</Text>
             <View style={s.pillsContainer}>
               {[8000, 10000, 12000].map(sg => (
-                <TouchableOpacity 
-                  key={sg} 
+                <TouchableOpacity
+                  key={sg}
                   style={[s.pill, stepGoal === sg && s.pillActive]}
                   onPress={() => setStepGoal(sg)}
                 >
                   <Text style={[s.pillText, stepGoal === sg && s.pillTextActive]}>
-                    {(sg/1000)}k
+                    {(sg / 1000)}k
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -230,4 +262,9 @@ const s = StyleSheet.create({
   pillTextActive: { color: '#fff', fontFamily: 'Nunito_700Bold' },
   saveBtn: { backgroundColor: '#F97316', borderRadius: 16, height: 56, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
   saveBtnText: { fontFamily: 'Nunito_700Bold', fontSize: 17, color: '#fff' },
+  avatarContainer: { alignSelf: 'center', alignItems: 'center', marginBottom: 30 },
+  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: '#F97316' },
+  avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#1e1e30', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2e2e44' },
+  avatarPlus: { position: 'absolute', bottom: 25, right: 0, backgroundColor: '#F97316', width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#13131f' },
+  avatarLabel: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, color: '#9999bb', marginTop: 8 },
 });
